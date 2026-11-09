@@ -1,0 +1,122 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>長期債務項目核對</title><style>
+:root{--n:#17365d;--b:#2f75b5;--bg:#eef2f6;--line:#d8e0e7;--ink:#26343e;--add:#d9f2d0;--del:#f8d0d0}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:"Microsoft JhengHei","Noto Sans TC",sans-serif;line-height:1.6}
+header{background:linear-gradient(135deg,#102a46,#2f75b5);color:#fff;padding:30px 16px}header div,main{max-width:1200px;margin:auto}h1{margin:0 0 6px}header a{color:#cfe3f5}
+main{padding:20px 16px 50px}.card{background:#fff;border:1px solid #e2e8ed;border-radius:14px;padding:20px;margin-bottom:18px}
+.card h2{color:var(--n);margin:0 0 12px;font-size:1.2rem}.drop{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+label.f{display:block;border:2px dashed #9fb1c0;border-radius:10px;padding:14px;cursor:pointer}label.f input{display:block;margin-top:6px;max-width:100%}label.f.over{border-color:var(--b);background:#eaf3f8}label.f small{display:block;color:#667784}
+button{border:0;background:var(--n);color:#fff;padding:9px 16px;border-radius:8px;cursor:pointer;font-weight:700;margin-top:12px}button:disabled{opacity:.5}
+table{width:100%;border-collapse:collapse;font-size:.9rem}th{background:var(--n);color:#fff;text-align:center;padding:8px;position:sticky;top:0}td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+.grp td{background:#eaf3f8;font-weight:700;color:var(--n)}.small{color:#667784;font-size:.86rem}td.c{text-align:center;white-space:nowrap}td.num{text-align:right;white-space:nowrap}
+ins{background:var(--add);text-decoration:none}del{background:var(--del)}.wrap{overflow-x:auto}table.chg td:nth-last-child(3){white-space:nowrap}
+@media(max-width:700px){.drop{grid-template-columns:1fr}}@media print{header,.card.in{display:none}th{position:static}}
+</style></head><body>
+<header><div><h1>長期債務項目核對</h1><p>上傳兩個年度的「長期債務舉借及償還綜計表」PDF，比對各借款項目的債權人、借款年度及償還期間有無差異。<br><a href="index.html">← 回專區</a></p></div></header>
+<main>
+<section class="card in"><h2>上傳 PDF</h2><div class="drop">
+<label class="f">上年度 PDF<small>拖曳檔案到這裡，或點選選擇</small><input type="file" id="fa" accept=".pdf"></label>
+<label class="f">新年度 PDF<small>拖曳檔案到這裡，或點選選擇</small><input type="file" id="fb" accept=".pdf"></label></div>
+<button id="go" disabled>開始核對</button> <span id="msg" class="small"></span>
+<p class="small">檔案只在瀏覽器內解析，不會上傳。以「主管＋基金＋借款項目名稱」配對；年度由表頭「中華民國○○○年度」自動判斷。</p></section>
+<div id="out"></div></main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const $=id=>document.getElementById(id), esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const norm=s=>s.replace(/\s+/g,'');
+const RAD={'⺠':'民','⻑':'長','⻄':'西','⻘':'青','⻝':'食','⻩':'黃','⻆':'角','⻭':'齒','⻯':'龍','⻜':'飛','⺟':'母','⻤':'鬼','⻣':'骨'};
+const fix=s=>s.normalize('NFKC').replace(/[⺀-⻿]/g,c=>RAD[c]||c);
+const isAmt=s=>/^-?\d{1,3}(,\d{3})*$|^-$/.test(s), toNum=s=>s==='-'?0:+s.replace(/,/g,''), fmt=n=>n.toLocaleString('en-US');
+const YR=/^\d{2,3}(-\d{2,3})?$/;   // 借款年度（92、111-125）、償還起、止
+const F=['債權人','借款年度','償還起','償還止'];
+
+// 單頁表：基金名稱及借款項目｜債權人｜借款年度｜償還期間 起 止｜本年度舉借數｜本年度償還數｜備註
+async function parse(buf){
+  const doc=await pdfjsLib.getDocument({data:buf}).promise, out=[];
+  let year='', cur={m:'',f:''}, last=null, lastHd=null;
+  for(let p=1;p<=doc.numPages;p++){
+    const pg=await doc.getPage(p), H=pg.getViewport({scale:1}).height;
+    const raw=(await pg.getTextContent()).items.filter(i=>i.str.trim()||(i.str&&i.width<4))
+      .map(i=>({x:i.transform[4],y:H-i.transform[5],w:i.width,t:fix(i.str)})).sort((a,b)=>Math.abs(a.y-b.y)>5?a.y-b.y:a.x-b.x), its=[];
+    for(const i of raw){const q=its[its.length-1]; if(q&&Math.abs(q.y-i.y)<=5&&i.x-(q.x+q.w)<1.5&&i.x>q.x){q.t+=i.t;q.w=i.x+i.w-q.x;} else its.push({...i});}
+    const T=its.map(i=>({...i,t:i.t.trim()})).filter(i=>i.t);
+    const ym=T.map(i=>i.t).join('').match(/中華民國(\d{2,3})年度/); if(ym&&!year) year=ym[1];
+    const qi=T.find(i=>i.t==='起'), zhi=T.find(i=>i.t==='止'), zhai=T.filter(i=>i.t==='債').sort((a,b)=>b.y-a.y)[0];
+    if(!qi||!zhi||!zhai) continue;
+    const top=qi.y+6, credL=zhai.x-20, yearL=qi.x-52, amtL=zhi.x+20;
+    const lines=[]; T.filter(i=>i.y>top).forEach(i=>{const l=lines.find(l=>Math.abs(l.y-i.y)<=5); l?l.its.push(i):lines.push({y:i.y,its:[i]});});
+    lines.sort((a,b)=>a.y-b.y);
+    for(const {its:l} of lines){
+      l.sort((a,b)=>a.x-b.x);
+      // 隱藏的殘字：行首一小段文字，同一行右邊又出現以它開頭的文字（115 年度「生　生宿舍新建工程」），只留右邊那段
+      for(let k=l.length-1;k>=0;k--){const i=l[k]; if(i.x<credL&&l.some(j=>j!==i&&j.x<credL&&j.x>i.x+i.w+20&&j.t.startsWith(i.t))) l.splice(k,1);}
+      const name=l.filter(i=>i.x<credL).map(i=>i.t).join(''), cred=l.filter(i=>i.x>=credL&&i.x<yearL).map(i=>i.t).join('');
+      if(/^合計|^註/.test(norm(name))) break;
+      const yrs=l.filter(i=>i.x>=yearL&&i.x<amtL&&YR.test(i.t)).map(i=>i.t), amts=l.filter(i=>i.x>=amtL&&isAmt(i.t)).map(i=>toNum(i.t));
+      const x0=l[0].x;
+      if(!yrs.length&&!amts.length){   // 續行：名稱或債權人換行
+        if(last&&x0>=50){last.name+=name;last.v['債權人']+=cred;} else if(lastHd&&name) lastHd.k==='m'?(cur.m+=name):(cur.f+=name);
+        continue;
+      }
+      if(x0<38){cur={m:name,f:''};lastHd={k:'m'};last=null;continue;}
+      if(x0<50){cur.f=name;lastHd={k:'f'};last=null;continue;}
+      // 借款年度可能缺，起止一定在最後兩格
+      const [st,en]=yrs.slice(-2), yr=yrs.length>2?yrs[0]:'';
+      last={m:cur.m,f:cur.f,name,v:{'債權人':cred,'借款年度':yr,'償還起':st||'','償還止':en||''},borrow:amts[0]||0,repay:amts[1]||0};
+      out.push(last); lastHd=null;
+    }
+  }
+  out.forEach(r=>{r.m=norm(r.m);r.f=norm(r.f);r.item=norm(r.name).replace(/^[（(][一二三四五六七八九十]+[）)]/,'');r.v['債權人']=norm(r.v['債權人']);});
+  return {year,rows:out};
+}
+
+function diff(a,b){
+  const n=a.length,m=b.length,d=Array.from({length:n+1},()=>new Uint16Array(m+1));
+  for(let i=n-1;i>=0;i--)for(let j=m-1;j>=0;j--)d[i][j]=a[i]===b[j]?d[i+1][j+1]+1:Math.max(d[i+1][j],d[i][j+1]);
+  let i=0,j=0,A='',B='';
+  while(i<n||j<m){
+    if(i<n&&j<m&&a[i]===b[j]){A+=esc(a[i]);B+=esc(b[j]);i++;j++;}
+    else if(j<m&&(i===n||d[i][j+1]>=d[i+1][j])){B+='<ins>'+esc(b[j++])+'</ins>';}
+    else A+='<del>'+esc(a[i++])+'</del>';
+  }
+  return [A.replace(/<\/del><del>/g,''),B.replace(/<\/ins><ins>/g,'')];
+}
+const lcs=(a,b)=>{let d=new Uint16Array(b.length+1);for(const c of a){let pr=0;for(let j=1;j<=b.length;j++){const t=d[j];d[j]=c===b[j-1]?pr+1:Math.max(d[j],d[j-1]);pr=t;}}return d[b.length];};
+
+function report(o,n){
+  const key=r=>r.m+'|'+r.f+'|'+r.item, om=new Map(o.rows.map(r=>[key(r),r])), used=new Set();
+  // 名稱小改（加註、錯字）：同主管同基金、相似度 ≥ 85% 視為同一項目
+  const fb=r=>o.rows.filter(p=>!used.has(key(p))&&!n.rows.some(q=>key(q)===key(p))&&p.m===r.m&&p.f===r.f)
+    .map(p=>[p,2*lcs(p.item,r.item)/(p.item.length+r.item.length)]).filter(x=>x[1]>=.85).sort((a,b)=>b[1]-a[1])[0]?.[0];
+  let h='',cnt=0,grp=''; const add=[];
+  for(const r of n.rows){
+    const p=om.get(key(r))||fb(r); if(!p){add.push(r);continue;} used.add(key(p));
+    const ch=F.filter(k=>p.v[k]!==r.v[k]), nc=p.item!==r.item;
+    if(!ch.length&&!nc) continue; cnt++;
+    const g=r.m+'｜'+r.f; if(g!==grp){grp=g;h+=`<tr class="grp"><td colspan="4">${esc(r.m)}　${esc(r.f)}</td></tr>`;}
+    const rows=(nc?[['借款項目名稱',...diff(p.item,r.item)]]:[]).concat(ch.map(k=>[k,...diff(p.v[k]||'（空白）',r.v[k]||'（空白）')]));
+    rows.forEach(([k,A,B],i)=>h+=`<tr>${i?'':`<td rowspan="${rows.length}">${esc(r.item)}</td>`}<td>${k}</td><td class="c">${A}</td><td class="c">${B}</td></tr>`);
+  }
+  const gone=o.rows.filter(r=>!used.has(key(r)));
+  const list=(t,a)=>`<section class="card"><h2>${t}（${a.length}）</h2>${a.length?`<div class="wrap"><table><thead><tr><th>主管／基金</th><th>借款項目</th><th>債權人</th><th>借款年度</th><th>償還期間</th><th>本年度舉借數</th><th>本年度償還數</th></tr></thead><tbody>${a.map(r=>`<tr><td>${esc(r.m)}<div class="small">${esc(r.f)}</div></td><td>${esc(r.item)}</td><td>${esc(r.v['債權人'])}</td><td class="c">${esc(r.v['借款年度'])}</td><td class="c">${esc(r.v['償還起'])}－${esc(r.v['償還止'])}</td><td class="num">${fmt(r.borrow)}</td><td class="num">${fmt(r.repay)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="small">無</p>'}</section>`;
+  $('out').innerHTML=`<section class="card"><h2>${n.year}年度較${o.year}年度有差異之借款項目（${cnt}）</h2><p class="small">共解析 ${o.year} 年度 ${o.rows.length} 項、${n.year} 年度 ${n.rows.length} 項。比對欄位：債權人、借款年度、償還期間（起、止）。<del>刪除</del>　<ins>新增</ins></p>
+  <div class="wrap"><table class="chg"><thead><tr><th style="width:34%">借款項目</th><th style="width:16%">欄位</th><th>${o.year}年度</th><th>${n.year}年度</th></tr></thead><tbody>${h||'<tr><td colspan="4">無差異</td></tr>'}</tbody></table></div></section>`
+  +list(`${n.year}年度新列借款項目`,add)+list(`${o.year}年度有、${n.year}年度未列借款項目`,gone);
+}
+
+const ready=()=>$('go').disabled=!($('fa').files[0]&&$('fb').files[0]);
+$('fa').onchange=$('fb').onchange=ready;
+document.querySelectorAll('label.f').forEach(l=>{const inp=l.querySelector('input');
+  l.ondragover=e=>{e.preventDefault();l.classList.add('over');};
+  l.ondragleave=()=>l.classList.remove('over');
+  l.ondrop=e=>{e.preventDefault();l.classList.remove('over');if(e.dataTransfer.files.length){inp.files=e.dataTransfer.files;ready();}};});
+addEventListener('dragover',e=>e.preventDefault());addEventListener('drop',e=>e.preventDefault());
+$('go').onclick=async()=>{
+  $('msg').textContent='解析中…';
+  try{
+    let [a,b]=await Promise.all([$('fa'),$('fb')].map(async e=>parse(await e.files[0].arrayBuffer())));
+    if(+a.year>+b.year)[a,b]=[b,a];
+    report(a,b); $('msg').textContent='';
+  }catch(e){$('msg').textContent='解析失敗：'+e.message;console.error(e);}
+};
+</script></body></html>
