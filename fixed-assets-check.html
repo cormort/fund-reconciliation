@@ -99,8 +99,10 @@ function diff(a,b){
 
 // Excel：每個計畫一列，名稱在「投資總額」欄之前（營業基金依縮排分在數欄），其後依序為各資金來源
 function parseXls(buf,fname){
-  const wb=XLSX.read(buf), cell=c=>fix(String(c??'')).trim();
-  const ws=wb.SheetNames.map(n=>XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:''}))
+  const wb=XLSX.read(buf,{cellStyles:true}), cell=c=>fix(String(c??'')).trim();
+  // 比照 xls2spread：Excel 裡隱藏的列不算（範本常留著已結束計畫的隱藏列）
+  const ws=wb.SheetNames.map(n=>{const sh=wb.Sheets[n],r0=sh['!ref']?XLSX.utils.decode_range(sh['!ref']).s.r:0,hid=sh['!rows']||[];
+      return XLSX.utils.sheet_to_json(sh,{header:1,raw:true,defval:'',blankrows:true}).filter((_,i)=>!hid[r0+i]?.hidden);})
     .find(a=>a.some(r=>r.some(c=>norm(cell(c))==='投資總額')));
   if(!ws) throw Error(fname+'：找不到「投資總額」欄');
   const all=ws.map(r=>r.map(cell).join('')).join('');
