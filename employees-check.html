@@ -1,0 +1,154 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>員工人數核對</title><style>
+:root{--n:#17365d;--b:#2f75b5;--bg:#eef2f6;--line:#d8e0e7;--ink:#26343e;--bad:#f8d0d0;--ok:#3f7d2c}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:"Microsoft JhengHei","Noto Sans TC",sans-serif;line-height:1.6}
+header{background:linear-gradient(135deg,#102a46,#2f75b5);color:#fff;padding:30px 16px}header div,main{max-width:1200px;margin:auto}h1{margin:0 0 6px}header a{color:#cfe3f5}
+main{padding:20px 16px 50px}.card{background:#fff;border:1px solid #e2e8ed;border-radius:14px;padding:20px;margin-bottom:18px}
+.card h2{color:var(--n);margin:0 0 12px;font-size:1.2rem}.drop{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+label.f{display:block;border:2px dashed #9fb1c0;border-radius:10px;padding:14px;cursor:pointer}label.f input{display:block;margin-top:6px;max-width:100%}label.f.over{border-color:var(--b);background:#eaf3f8}label.f small{display:block;color:#667784}
+button{border:0;background:var(--n);color:#fff;padding:9px 16px;border-radius:8px;cursor:pointer;font-weight:700;margin-top:12px}button:disabled{opacity:.5}
+table{width:100%;border-collapse:collapse;font-size:.88rem}th{background:var(--n);color:#fff;text-align:center;padding:7px 5px;position:sticky;top:0}td{padding:6px 5px;border-bottom:1px solid var(--line);vertical-align:top}
+td.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}td.bad{background:var(--bad);font-weight:700}.grp td{background:#eaf3f8;font-weight:700;color:var(--n)}
+.small{color:#667784;font-size:.84rem}.ok{color:var(--ok);font-weight:700}.ng{color:#a33;font-weight:700}.wrap{overflow-x:auto}
+@media(max-width:700px){.drop{grid-template-columns:1fr}}@media print{header,.card.in{display:none}th{position:static}}
+</style></head><body>
+<header><div><h1>員工人數核對</h1><p>上傳系統產生的「員工人數明細表」PDF，與人事總處「預算員額分配一覽表」（zip 或個別 Excel／ODS）逐基金核對專任人員人數。<br><a href="index.html">← 回專區</a></p></div></header>
+<main>
+<section class="card in"><h2>上傳檔案</h2><div class="drop">
+<label class="f">員工人數明細表 PDF<small>拖曳檔案到這裡，或點選選擇（營業或非營業特種基金皆可）</small><input type="file" id="fa" accept=".pdf"></label>
+<label class="f">預算員額分配一覽表<small>拖曳 zip 或多個 Excel／ODS 到這裡，或點選選擇</small><input type="file" id="fb" accept=".zip,.xls,.xlsx,.ods" multiple></label></div>
+<button id="go" disabled>開始核對</button> <button id="xl" hidden>匯出 Excel</button> <span id="msg" class="small"></span>
+<p class="small">檔案只在瀏覽器內解析，不會上傳。PDF 的各基金依名稱對到一覽表中同名基金列（一覽表名稱前冠部會名稱、後加「合計」者亦可）；名稱對不到時，改找人數完全相同的基金列並註明。同一基金在「甲、業務支出」「乙、資本支出」分列者先合併再比。一覽表的「警察」含法警，「聘用」含一般及當地專業。</p></section>
+<div id="out"></div></main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const $=id=>document.getElementById(id), esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const norm=s=>String(s??'').replace(/\s+/g,'');
+const RAD={'⺠':'民','⻑':'長','⻄':'西','⻘':'青','⻝':'食','⻩':'黃','⻆':'角','⻭':'齒','⻯':'龍','⻜':'飛','⺟':'母','⻤':'鬼','⻣':'骨'};
+const fix=s=>s.normalize('NFKC').replace(/[⺀-⻿]/g,c=>RAD[c]||c);
+const F=['職員','警察','駐衛警','技工','工友','駕駛','聘用','約僱','合計'];
+const fmt=n=>n.toLocaleString('en-US');
+
+// PDF：每列 11 個數字（9 欄專任＋管理會委員及顧問＋兼任），名稱換行接回上一列；主管列縮排較淺
+async function parsePdf(buf){
+  const doc=await pdfjsLib.getDocument({data:buf}).promise, rows=[]; let year='';
+  for(let p=1;p<=doc.numPages;p++){
+    const pg=await doc.getPage(p),H=pg.getViewport({scale:1}).height;
+    const raw=(await pg.getTextContent()).items.filter(i=>i.str.trim()||(i.str&&i.width<4)).map(i=>({x:i.transform[4],y:H-i.transform[5],w:i.width,t:fix(i.str)}))
+      .sort((a,b)=>Math.abs(a.y-b.y)>5?a.y-b.y:a.x-b.x), its=[];
+    for(const i of raw){const q=its[its.length-1]; if(q&&Math.abs(q.y-i.y)<=5&&i.x-(q.x+q.w)<1.5&&i.x>q.x){q.t+=i.t;q.w=i.x+i.w-q.x;} else its.push({...i});}
+    const T=its.map(i=>({...i,t:i.t.trim()})).filter(i=>i.t);
+    const ym=T.map(i=>i.t).join('').match(/中華民國(\d{2,3})年度/); if(ym&&!year) year=ym[1];
+    const lines=[]; T.forEach(i=>{const l=lines.find(l=>Math.abs(l.y-i.y)<=5); l?l.its.push(i):lines.push({y:i.y,its:[i]});});
+    lines.sort((a,b)=>a.y-b.y); let last=null;
+    for(const {its:l} of lines){
+      l.sort((a,b)=>a.x-b.x);
+      const nums=l.filter(i=>/^(\d{1,3}(,\d{3})*|-)$/.test(i.t)), name=l.filter(i=>!nums.includes(i)).map(i=>i.t).join('');
+      if(/^註/.test(name)) break;
+      if(nums.length>=9){last={x:l[0].x,name,v:nums.slice(0,9).map(i=>i.t==='-'?0:+i.t.replace(/,/g,''))}; rows.push(last);}
+      else if(last&&!nums.length&&Math.abs(l[0].x-last.x)<15) last.name+=name;
+    }
+  }
+  // 主管列、「甲、業務支出部分」等小計列與合計列不比，其餘是基金
+  let m=''; const funds=new Map();
+  for(const r of rows){ const nm=norm(r.name);
+    if(/主管$/.test(nm)){m=nm;continue;}
+    if(/^[甲乙丙丁]、|^合計$/.test(nm)||!m) continue;
+    const k=m+'|'+nm, f=funds.get(k);
+    f? f.v=f.v.map((x,i)=>x+r.v[i]) : funds.set(k,{m,name:nm,v:[...r.v],parts:0});
+    funds.get(k).parts++;
+  }
+  return {year,funds:[...funds.values()]};
+}
+
+// 一覽表：每列 12 個數字＝職員、警察、法警、駐警、工友、技工、駕駛、聘用一般、聘用當地專業、約僱、駐外雇員、合計
+async function readBooks(files){
+  const books=[];
+  for(const f of files){
+    if(/\.zip$/i.test(f.name)){ const z=await JSZip.loadAsync(await f.arrayBuffer());
+      for(const e of Object.values(z.files)) if(!e.dir&&/\.(xlsx?|ods)$/i.test(e.name)) books.push({name:e.name.split('/').pop(),buf:await e.async('arraybuffer')}); }
+    else books.push({name:f.name,buf:await f.arrayBuffer()});
+  }
+  const rows=[];
+  for(const b of books){ const wb=XLSX.read(b.buf);
+    for(const sn of wb.SheetNames){ const a=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:''});
+      if(a.slice(0,3).some(r=>r.some(c=>/彙計/.test(c)))) continue;     // 總員額法彙計表只有部會總數
+      for(const r of a){ const ns=r.filter(c=>typeof c==='number'); if(ns.length!==12) continue;
+        const raw=norm(fix(String(r.find(c=>typeof c==='string'&&c.trim())||'')));
+        const [職員,警察,法警,駐警,工友,技工,駕駛,一般,當地,約僱,,合計]=ns;
+        const v=[職員,警察+法警,駐警,技工,工友,駕駛,一般+當地,約僱,合計];
+        // 同一檔案有多個工作表重複同樣內容（故宮、考試院等），同名同數的列只留一筆
+        if(rows.some(x=>x.file===b.name&&x.raw===raw&&x.v.join()===v.join())) continue;
+        rows.push({file:b.name,raw,key:raw.replace(/合計$/,''),v}); }
+    }
+  }
+  return {books:books.length,rows};
+}
+
+// 一覽表多以機關列示，名稱與基金不完全相同：
+// 「國立臺灣大學醫學院附設醫院暨其分院」＝國立臺灣大學附設醫院作業基金；營建建設基金分「-新市鎮開發基金」「-住宅基金」兩列
+const ALIAS={'國立大學校院校務基金(綜計)':'國立大專校務基金'};
+const core=s=>s.replace(/合計$/,'').replace(/\(綜計\)/,'').replace('醫學院','').replace(/暨其分院$|暨所屬$/,'').replace(/作業基金$|基金$/,'');
+function match(fund,xs){
+  const k=ALIAS[fund.name]||fund.name, c=core(k);
+  let cand=xs.filter(r=>r.key===k||r.key.endsWith(k)||r.key.includes(k+'-'));
+  let loose=false;
+  if(!cand.length){cand=xs.filter(r=>c.length>3&&core(r.key).endsWith(c)); loose=true;}
+  // 寬鬆比對（去掉醫學院、暨其分院等）對到多個機關列又沒有彙總列時不加總，改用人數比對（例：科學園區管理局作業基金≠三個管理局公務員額）
+  if(loose&&cand.length>1&&!cand.some(r=>/合計$|暨其分院$|暨所屬/.test(r.raw))) cand=[];
+  if(cand.length){
+    // 有「合計」或「暨其分院／暨所屬」彙總列就用它；否則同名各列加總（例：兩個機關各列一部分）
+    const agg=cand.filter(r=>/合計$|暨其分院$|暨所屬/.test(r.raw));
+    const use=agg.length?[agg.sort((a,b)=>a.key.length-b.key.length)[0]]:cand;
+    return {x:{raw:use.map(r=>r.raw).join('＋'),file:[...new Set(use.map(r=>r.file))].join('、'),v:F.map((_,i)=>use.reduce((s,r)=>s+r.v[i],0))},how:'name',
+      other:xs.find(r=>r.key===use[0].key+'其他')};
+  }
+  if(fund.v.every(x=>!x)) return {x:null,how:'zero'};   // PDF 無專任員額、一覽表也沒有這個基金
+  const same=xs.find(r=>/基金/.test(r.raw)&&r.v.every((x,i)=>x===fund.v[i]));
+  return same?{x:same,how:'num'}:null;
+}
+
+let RES=null;
+function report(P,X){
+  let h='',grp='',ok=0,ng=0,zero=0,miss=[];
+  for(const f of P.funds){
+    const mt=match(f,X.rows);
+    if(!mt){miss.push(f);continue;}
+    if(mt.how==='zero'){zero++;continue;}
+    const bad=F.map((_,i)=>f.v[i]!==mt.x.v[i]), any=bad.some(Boolean); any?ng++:ok++;
+    if(f.m!==grp){grp=f.m;h+=`<tr class="grp"><td colspan="${F.length+2}">${esc(f.m)}</td></tr>`;}
+    // 差額剛好是一覽表「○○其他」列（例：校務基金尚未分配各校的員額）就註明
+    const oth=any&&mt.other&&F.every((_,i)=>mt.x.v[i]-f.v[i]===mt.other.v[i])?`；差額等於一覽表「${esc(mt.other.raw)}」列`:'';
+    const src=`${esc(mt.x.raw)}<br><span class="small">${esc(mt.x.file)}${mt.how==='num'?'（名稱不同，依人數對到）':''}${f.parts>1?'；PDF 甲乙兩部分合併':''}${oth}</span>`;
+    h+=`<tr><td rowspan="2">${esc(f.name)}<br><span class="${any?'ng':'ok'}">${any?'不符':'相符'}</span></td><td>PDF</td>${f.v.map((v,i)=>`<td class="n${bad[i]?' bad':''}">${fmt(v)}</td>`).join('')}</tr>`
+      +`<tr><td>一覽表<br>${src}</td>${mt.x.v.map((v,i)=>`<td class="n${bad[i]?' bad':''}">${fmt(v)}</td>`).join('')}</tr>`;
+  }
+  $('out').innerHTML=`<section class="card"><h2>${P.year}年度員工人數核對（相符 ${ok}、不符 ${ng}${miss.length?`、對不到 ${miss.length}`:''}）</h2><p class="small">PDF 共 ${P.funds.length} 個基金${zero?`，其中 ${zero} 個無專任員額且一覽表未列，不另列示`:''}；一覽表共讀入 ${X.books} 個檔案、${X.rows.length} 列。紅底為兩邊不同的欄位。</p>
+  <div class="wrap"><table><thead><tr><th>基金</th><th>來源</th>${F.map(k=>`<th>${k}</th>`).join('')}</tr></thead><tbody>${h}</tbody></table></div></section>`
+  +(miss.length?`<section class="card"><h2>一覽表找不到對應的基金（${miss.length}）</h2><div class="wrap"><table><thead><tr><th>主管</th><th>基金</th>${F.map(k=>`<th>${k}</th>`).join('')}</tr></thead><tbody>${miss.map(f=>`<tr><td>${esc(f.m)}</td><td>${esc(f.name)}</td>${f.v.map(v=>`<td class="n">${fmt(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></div></section>`:'');
+}
+
+function exportXlsx(name){
+  const wb=XLSX.utils.book_new();
+  document.querySelectorAll('#out section').forEach((s,i)=>{const t=s.querySelector('table'); if(!t) return;
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.table_to_sheet(t),s.querySelector('h2').textContent.replace(/（[^）]*）/g,'').replace(/[\\/?*\[\]:]/g,'').slice(0,31)||'表'+(i+1));});
+  XLSX.writeFile(wb,name+'.xlsx');
+}
+const ready=()=>$('go').disabled=!($('fa').files[0]&&$('fb').files.length);
+$('fa').onchange=$('fb').onchange=ready;
+document.querySelectorAll('label.f').forEach(l=>{const inp=l.querySelector('input');
+  l.ondragover=e=>{e.preventDefault();l.classList.add('over');};
+  l.ondragleave=()=>l.classList.remove('over');
+  l.ondrop=e=>{e.preventDefault();l.classList.remove('over');if(e.dataTransfer.files.length){inp.files=e.dataTransfer.files;ready();}};});
+addEventListener('dragover',e=>e.preventDefault());addEventListener('drop',e=>e.preventDefault());
+$('go').onclick=async()=>{
+  $('msg').textContent='解析中…';
+  try{
+    const [P,X]=await Promise.all([parsePdf(await $('fa').files[0].arrayBuffer()),readBooks([...$('fb').files])]);
+    report(P,X); $('msg').textContent='';
+    $('xl').hidden=false; $('xl').onclick=()=>exportXlsx(`員工人數核對_${P.year}`);
+  }catch(e){$('msg').textContent='解析失敗：'+e.message;console.error(e);}
+};
+</script></body></html>
