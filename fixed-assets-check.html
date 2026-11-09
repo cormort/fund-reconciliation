@@ -11,7 +11,7 @@ table{width:100%;border-collapse:collapse;font-size:.9rem}th{background:var(--n)
 ins{background:var(--add);text-decoration:none}del{background:var(--del)}.wrap{overflow-x:auto}.up{color:#a33}.dn{color:#3f7d2c}
 @media(max-width:700px){.drop{grid-template-columns:1fr}}@media print{header,.card.in{display:none}th{position:static}}
 </style></head><body>
-<header><div><h1>固定資產計畫核對</h1><p>上傳兩個年度的「固定資產建設改良擴充計畫及成本效益分析綜計表」PDF 或 Excel（兩年度可混用），比對新年度計畫的投資總額（總經費）、資金來源及計畫內容（含目標能量）修正情形。<br><a href="index.html">← 回專區</a></p></div></header>
+<header><div><h1>固定資產計畫核對</h1><p>上傳兩個年度的「固定資產建設改良擴充計畫及成本效益分析綜計表」PDF 或 Excel（兩年度可混用），比對新年度計畫的投資總額（總經費）、資金來源、計畫期間及計畫內容（含目標能量）修正情形。<br><a href="index.html">← 回專區</a></p></div></header>
 <main>
 <section class="card in"><h2>上傳 PDF 或 Excel</h2><div class="drop">
 <label class="f">上年度 PDF／Excel<small>拖曳檔案到這裡，或點選選擇</small><input type="file" id="fa" accept=".pdf,.xls,.xlsx"></label>
@@ -54,7 +54,7 @@ async function parse(buf){
     const nameR=Math.min(...nums.map(n=>n.x))-2;
     const dates=R.filter(i=>/^\d{2,3}\.\d{1,2}-\d/.test(i.t)), contR=dates.length?Math.min(...dates.map(i=>i.x))-1:165;
     if(/出售不適用/.test(L.map(i=>i.t).join(''))) biz=true;
-    SP.push({p,nums,names:body.filter(i=>i.x<nameR),cont:R.filter(i=>i.x<contR&&i.y>top)});
+    SP.push({p,nums,dates,names:body.filter(i=>i.x<nameR),cont:R.filter(i=>i.x<contR&&i.y>top)});
   }
   const F=biz
     ? ['投資總額','營運資金','出售不適用資產','增資','其他','外借資金']    // 營業基金
@@ -64,7 +64,7 @@ async function parse(buf){
   const cols=ends.filter(g=>g.length>2).map(g=>g.at(-1));
   if(cols.length!==F.length) throw Error(`欄位辨識失敗：應有 ${F.length} 欄，找到 ${cols.length} 欄`);
   const textIn=(arr,a,b)=>arr.filter(i=>i.y>=a&&i.y<b).sort((u,v)=>Math.abs(u.y-v.y)>5?u.y-v.y:u.x-v.x).map(i=>i.t).join('');
-  for(const {nums,names,cont} of SP){
+  for(const {nums,names,cont,dates} of SP){
     // 同一列的中文與數字基線可能差 2～3pt，相近的錨點併成一個，否則會多出一筆無名稱的重複計畫
     const ys=[...new Set(names.filter(n=>nums.some(v=>Math.abs(v.y-n.y)<4)).map(n=>Math.round(n.y)))].sort((a,b)=>a-b).filter((y,i,a)=>!i||y-a[i-1]>=4);
     // 跨頁：本版第一個錨點之前的文字接回上一筆
@@ -78,7 +78,8 @@ async function parse(buf){
       if(/^[一二三四五六七八九十]+、/.test(name)){cur.c=name.replace(/^.+?、/,'');return;}
       if(x0<43){cur.f=name;cur.c='';return;}
       if(!/^(繼續|新興)計畫$/.test(cur.c)) return;
-      last={m:cur.m,f:cur.f,c:cur.c,name,v,text:textIn(cont,y-4,nx)}; out.push(last);
+      const per=dates.filter(i=>i.y>=y-4&&i.y<nx).sort((a,b)=>a.y-b.y)[0]?.t||'';
+      last={m:cur.m,f:cur.f,c:cur.c,name,v,per,text:textIn(cont,y-4,nx)}; out.push(last);
     });
   }
   out.forEach(r=>{r.plan=norm(r.name).replace(/[（(][一二三四五六七八九十]+[）)]/g,'').replace(/^\d+\./,'');/* 序號有時被排進名稱中間；營業基金用「1.」 */r.text=norm(r.text);});
@@ -111,6 +112,7 @@ function parseXls(buf,fname){
   const F=/出售不適用/.test(all)?['投資總額','營運資金','出售不適用資產','增資','其他','外借資金']:['投資總額','營運資金','國庫撥補','外借資金','其他'];
   const hr=ws.find(r=>r.some(c=>norm(cell(c))==='投資總額')), ci=hr.findIndex(c=>norm(cell(c))==='投資總額');
   const ti=ws.map(r=>r.findIndex(c=>/目標能量|計畫內容/.test(norm(cell(c))))).find(i=>i>=0);
+  const pi=ws.map(r=>r.findIndex(c=>/^進度/.test(norm(cell(c))))).find(i=>i>=0);
   const num=c=>typeof c==='number'||isNum(cell(c));
   let cur={m:'',f:'',c:''}, last=null; const out=[];
   for(const r of ws){
@@ -124,12 +126,14 @@ function parseXls(buf,fname){
     if(parts[0]&&(ci>1||/基金(\(.*\))?$/.test(name))){cur.f=name;cur.c='';continue;}
     if(!/^(繼續|新興)計畫$/.test(cur.c)) continue;
     if(!v['投資總額']) continue;   // 隱藏的全 0 佔位列（例：已結束的計畫留在範本裡）
-    last={m:cur.m,f:cur.f,c:cur.c,name,v,text}; out.push(last);
+    last={m:cur.m,f:cur.f,c:cur.c,name,v,per:pi>=0?norm(cell(r[pi])):'',text}; out.push(last);
   }
   out.forEach(r=>{r.plan=norm(r.name).replace(/[（(][一二三四五六七八九十]+[）)]/g,'').replace(/^\d+\./,'');r.text=norm(r.text);});
   return {year,F,rows:out};
 }
 const load=async f=>/\.xlsx?$/i.test(f.name)?parseXls(await f.arrayBuffer(),f.name):parse(await f.arrayBuffer());
+// 計畫期間：116.01-116.12 與 116.1-116.12 視為相同
+const pn=s=>norm(s).replace(/(^|[.\-])0+(?=\d)/g,'$1');
 const lcs=(a,b)=>{let d=new Uint16Array(b.length+1);for(const c of a){let pr=0;for(let j=1;j<=b.length;j++){const t=d[j];d[j]=c===b[j-1]?pr+1:Math.max(d[j],d[j-1]);pr=t;}}return d[b.length];};
 function report(o,n){
   if(o.F.join()!==n.F.join()) throw Error('兩個檔案的表格格式不同（營業／非營業基金）');
@@ -144,14 +148,15 @@ function report(o,n){
     let p=om.get(key(r));
     if(!p&&r.c!=='新興計畫'&&(p=fb(r))) om.set('*'+key(p),1);   // 新興計畫本來就是新案，不做名稱相似配對（第一期／第二期）
     if(!p){add.push(r);continue;} seen.add(key(p));
-    const ch=F.filter(k=>(p.v[k]||0)!==(r.v[k]||0)), tc=p.text!==r.text, nc=p.plan!==r.plan;
-    if(!ch.length&&!tc&&!nc) continue; cnt++;
+    const ch=F.filter(k=>(p.v[k]||0)!==(r.v[k]||0)), tc=p.text!==r.text, nc=p.plan!==r.plan, pc=p.per&&r.per&&pn(p.per)!==pn(r.per);
+    if(!ch.length&&!tc&&!nc&&!pc) continue; cnt++;
     const g=r.m+'｜'+r.f; if(g!==grp){grp=g;h+=`<tr class="grp"><td colspan="5">${esc(r.m)}　${esc(r.f)}</td></tr>`;}
-    const rs=ch.length+(tc?1:0)+(nc?1:0); let first=true;
+    const rs=ch.length+(tc?1:0)+(nc?1:0)+(pc?1:0); let first=true;
     if(nc){const [A,B]=diff(p.plan,r.plan);h+=`<tr>${(first=false,`<td rowspan="${rs}">${esc(r.plan)}<div class="small">${o.year}：${esc(p.c)} → ${n.year}：${esc(r.c)}</div></td>`)}<td>計畫名稱</td><td>${A}</td><td>${B}</td><td></td></tr>`;}
     const pre=()=>{const s=first?`<td rowspan="${rs}">${esc(r.plan)}<div class="small">${o.year}：${esc(p.c)} → ${n.year}：${esc(r.c)}</div></td>`:'';first=false;return s;};
     ch.forEach(k=>{const a=p.v[k]||0,b=r.v[k]||0,d=b-a;
       h+=`<tr>${pre()}<td>${k==='投資總額'?'投資總額（總經費）':'資金來源－'+k}</td><td class="amt"><span>${fmt(a)}</span></td><td class="amt"><span>${fmt(b)}</span></td><td class="amt ${d>0?'up':'dn'}"><span>${d>0?'+':''}${fmt(d)}</span></td></tr>`;});
+    if(pc){const [A,B]=diff(pn(p.per),pn(r.per));h+=`<tr>${pre()}<td>計畫期間（進度起迄）</td><td class="amt">${A}</td><td class="amt">${B}</td><td></td></tr>`;}
     if(tc){const [A,B]=diff(p.text,r.text);h+=`<tr>${pre()}<td>計畫內容（目標能量）</td><td>${A}</td><td>${B}</td><td></td></tr>`;}
   }
   const gone=o.rows.filter(r=>!seen.has(key(r)));
