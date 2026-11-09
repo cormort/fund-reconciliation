@@ -7,7 +7,7 @@ main{padding:20px 16px 50px}.card{background:#fff;border:1px solid #e2e8ed;borde
 label.f{display:block;border:2px dashed #9fb1c0;border-radius:10px;padding:14px;cursor:pointer}label.f input{display:block;margin-top:6px;max-width:100%}label.f.over{border-color:var(--b);background:#eaf3f8}label.f small{display:block;color:#667784}
 button{border:0;background:var(--n);color:#fff;padding:9px 16px;border-radius:8px;cursor:pointer;font-weight:700;margin-top:12px}button:disabled{opacity:.5}
 table{width:100%;border-collapse:collapse;font-size:.9rem}th{background:var(--n);color:#fff;text-align:center;padding:8px;position:sticky;top:0}td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
-.num{text-align:right;white-space:nowrap}th.num{text-align:center}.grp td{background:#eaf3f8;font-weight:700;color:var(--n)}.small{color:#667784;font-size:.86rem}
+.num{text-align:right;white-space:nowrap}td.amt{text-align:center;white-space:nowrap}td.amt span{display:inline-block;min-width:9em;text-align:right;font-variant-numeric:tabular-nums}th.num{text-align:center}.grp td{background:#eaf3f8;font-weight:700;color:var(--n)}.small{color:#667784;font-size:.86rem}
 ins{background:var(--add);text-decoration:none}del{background:var(--del)}.wrap{overflow-x:auto}.up{color:#a33}.dn{color:#3f7d2c}
 @media(max-width:700px){.drop{grid-template-columns:1fr}}@media print{header,.card.in{display:none}th{position:static}}
 </style></head><body>
@@ -151,7 +151,7 @@ function report(o,n){
     if(nc){const [A,B]=diff(p.plan,r.plan);h+=`<tr>${(first=false,`<td rowspan="${rs}">${esc(r.plan)}<div class="small">${o.year}：${esc(p.c)} → ${n.year}：${esc(r.c)}</div></td>`)}<td>計畫名稱</td><td>${A}</td><td>${B}</td><td></td></tr>`;}
     const pre=()=>{const s=first?`<td rowspan="${rs}">${esc(r.plan)}<div class="small">${o.year}：${esc(p.c)} → ${n.year}：${esc(r.c)}</div></td>`:'';first=false;return s;};
     ch.forEach(k=>{const a=p.v[k]||0,b=r.v[k]||0,d=b-a;
-      h+=`<tr>${pre()}<td>${k==='投資總額'?'投資總額（總經費）':'資金來源－'+k}</td><td class="num">${fmt(a)}</td><td class="num">${fmt(b)}</td><td class="num ${d>0?'up':'dn'}">${d>0?'+':''}${fmt(d)}</td></tr>`;});
+      h+=`<tr>${pre()}<td>${k==='投資總額'?'投資總額（總經費）':'資金來源－'+k}</td><td class="amt"><span>${fmt(a)}</span></td><td class="amt"><span>${fmt(b)}</span></td><td class="amt ${d>0?'up':'dn'}"><span>${d>0?'+':''}${fmt(d)}</span></td></tr>`;});
     if(tc){const [A,B]=diff(p.text,r.text);h+=`<tr>${pre()}<td>計畫內容（目標能量）</td><td>${A}</td><td>${B}</td><td></td></tr>`;}
   }
   const gone=o.rows.filter(r=>!seen.has(key(r)));
