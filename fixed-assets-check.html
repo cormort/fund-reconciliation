@@ -4,7 +4,7 @@
 header{background:linear-gradient(135deg,#102a46,#2f75b5);color:#fff;padding:30px 16px}header div,main{max-width:1200px;margin:auto}h1{margin:0 0 6px}header a{color:#cfe3f5}
 main{padding:20px 16px 50px}.card{background:#fff;border:1px solid #e2e8ed;border-radius:14px;padding:20px;margin-bottom:18px}
 .card h2{color:var(--n);margin:0 0 12px;font-size:1.2rem}.drop{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-label.f{display:block;border:2px dashed #9fb1c0;border-radius:10px;padding:14px;cursor:pointer}label.f input{display:block;margin-top:6px;max-width:100%}
+label.f{display:block;border:2px dashed #9fb1c0;border-radius:10px;padding:14px;cursor:pointer}label.f input{display:block;margin-top:6px;max-width:100%}label.f.over{border-color:var(--b);background:#eaf3f8}label.f small{display:block;color:#667784}
 button{border:0;background:var(--n);color:#fff;padding:9px 16px;border-radius:8px;cursor:pointer;font-weight:700;margin-top:12px}button:disabled{opacity:.5}
 table{width:100%;border-collapse:collapse;font-size:.9rem}th{background:var(--n);color:#fff;text-align:center;padding:8px;position:sticky;top:0}td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
 .num{text-align:right;white-space:nowrap}th.num{text-align:center}.grp td{background:#eaf3f8;font-weight:700;color:var(--n)}.small{color:#667784;font-size:.86rem}
@@ -14,8 +14,8 @@ ins{background:var(--add);text-decoration:none}del{background:var(--del)}.wrap{o
 <header><div><h1>固定資產計畫核對</h1><p>上傳兩個年度的「固定資產建設改良擴充計畫及成本效益分析綜計表」PDF 或 Excel（兩年度可混用），比對新年度計畫的投資總額（總經費）、資金來源及計畫內容（含目標能量）修正情形。<br><a href="index.html">← 回專區</a></p></div></header>
 <main>
 <section class="card in"><h2>上傳 PDF 或 Excel</h2><div class="drop">
-<label class="f">上年度 PDF／Excel<input type="file" id="fa" accept=".pdf,.xls,.xlsx"></label>
-<label class="f">新年度 PDF／Excel<input type="file" id="fb" accept=".pdf,.xls,.xlsx"></label></div>
+<label class="f">上年度 PDF／Excel<small>拖曳檔案到這裡，或點選選擇</small><input type="file" id="fa" accept=".pdf,.xls,.xlsx"></label>
+<label class="f">新年度 PDF／Excel<small>拖曳檔案到這裡，或點選選擇</small><input type="file" id="fb" accept=".pdf,.xls,.xlsx"></label></div>
 <button id="go" disabled>開始核對</button> <span id="msg" class="small"></span>
 <p class="small">檔案只在瀏覽器內解析，不會上傳。PDF 與 Excel（.xls／.xlsx）皆可，兩年度可混用。支援非營業特種基金（資金來源：營運資金、國庫撥補、外借資金、其他）及營業基金（營運資金、出售不適用資產、增資、其他、外借資金）兩種格式，自動判斷。比對範圍為各基金「繼續計畫」及「新興計畫」下的個別計畫，以「主管＋基金＋計畫名稱」配對；年度由表頭「○○○年度」自動判斷。</p></section>
 <div id="out"></div></main>
@@ -162,6 +162,13 @@ function report(o,n){
 
 const ready=()=>$('go').disabled=!($('fa').files[0]&&$('fb').files[0]);
 $('fa').onchange=$('fb').onchange=ready;
+// 拖曳區：檔案放進框裡就塞進對應的 input
+document.querySelectorAll('label.f').forEach(l=>{const inp=l.querySelector('input');
+  l.ondragover=e=>{e.preventDefault();l.classList.add('over');};
+  l.ondragleave=()=>l.classList.remove('over');
+  l.ondrop=e=>{e.preventDefault();l.classList.remove('over');if(e.dataTransfer.files.length){inp.files=e.dataTransfer.files;ready();}};});
+// 拖到框外不要讓瀏覽器直接開檔
+addEventListener('dragover',e=>e.preventDefault());addEventListener('drop',e=>e.preventDefault());
 $('go').onclick=async()=>{
   $('msg').textContent='解析中…';
   try{
