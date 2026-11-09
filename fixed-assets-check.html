@@ -65,7 +65,8 @@ async function parse(buf){
   if(cols.length!==F.length) throw Error(`欄位辨識失敗：應有 ${F.length} 欄，找到 ${cols.length} 欄`);
   const textIn=(arr,a,b)=>arr.filter(i=>i.y>=a&&i.y<b).sort((u,v)=>Math.abs(u.y-v.y)>5?u.y-v.y:u.x-v.x).map(i=>i.t).join('');
   for(const {nums,names,cont} of SP){
-    const ys=[...new Set(names.filter(n=>nums.some(v=>Math.abs(v.y-n.y)<4)).map(n=>Math.round(n.y)))].sort((a,b)=>a-b);
+    // 同一列的中文與數字基線可能差 2～3pt，相近的錨點併成一個，否則會多出一筆無名稱的重複計畫
+    const ys=[...new Set(names.filter(n=>nums.some(v=>Math.abs(v.y-n.y)<4)).map(n=>Math.round(n.y)))].sort((a,b)=>a-b).filter((y,i,a)=>!i||y-a[i-1]>=4);
     // 跨頁：本版第一個錨點之前的文字接回上一筆
     if(last){ const y0=ys.length?ys[0]-4:1e9; last.name+=textIn(names,0,y0); last.text+=textIn(cont,0,y0); }
     ys.forEach((y,k)=>{
