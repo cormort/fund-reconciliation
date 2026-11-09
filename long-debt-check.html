@@ -16,10 +16,11 @@ ins{background:var(--add);text-decoration:none}del{background:var(--del)}.wrap{o
 <section class="card in"><h2>上傳 PDF</h2><div class="drop">
 <label class="f">上年度 PDF<small>拖曳檔案到這裡，或點選選擇</small><input type="file" id="fa" accept=".pdf"></label>
 <label class="f">新年度 PDF<small>拖曳檔案到這裡，或點選選擇</small><input type="file" id="fb" accept=".pdf"></label></div>
-<button id="go" disabled>開始核對</button> <span id="msg" class="small"></span>
+<button id="go" disabled>開始核對</button> <button id="xl" hidden>匯出 Excel</button> <span id="msg" class="small"></span>
 <p class="small">檔案只在瀏覽器內解析，不會上傳。以「主管＋基金＋借款項目名稱」配對；年度由表頭「中華民國○○○年度」自動判斷。</p></section>
 <div id="out"></div></main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 const $=id=>document.getElementById(id), esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
@@ -98,12 +99,20 @@ function report(o,n){
     rows.forEach(([k,A,B],i)=>h+=`<tr>${i?'':`<td rowspan="${rows.length}">${esc(r.item)}</td>`}<td>${k}</td><td class="c">${A}</td><td class="c">${B}</td></tr>`);
   }
   const gone=o.rows.filter(r=>!used.has(key(r)));
-  const list=(t,a)=>`<section class="card"><h2>${t}（${a.length}）</h2>${a.length?`<div class="wrap"><table><thead><tr><th>主管／基金</th><th>借款項目</th><th>債權人</th><th>借款年度</th><th>償還期間</th><th>本年度舉借數</th><th>本年度償還數</th></tr></thead><tbody>${a.map(r=>`<tr><td>${esc(r.m)}<div class="small">${esc(r.f)}</div></td><td>${esc(r.item)}</td><td>${esc(r.v['債權人'])}</td><td class="c">${esc(r.v['借款年度'])}</td><td class="c">${esc(r.v['償還起'])}－${esc(r.v['償還止'])}</td><td class="num">${fmt(r.borrow)}</td><td class="num">${fmt(r.repay)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="small">無</p>'}</section>`;
+  const list=(t,a)=>`<section class="card"><h2>${t}（${a.length}）</h2>${a.length?`<div class="wrap"><table><thead><tr><th>主管／基金</th><th>借款項目</th><th>債權人</th><th>借款年度</th><th>償還期間</th><th>本年度舉借數</th><th>本年度償還數</th></tr></thead><tbody>${a.map(r=>`<tr><td>${esc(r.m)}<br><span class="small">${esc(r.f)}</span></td><td>${esc(r.item)}</td><td>${esc(r.v['債權人'])}</td><td class="c">${esc(r.v['借款年度'])}</td><td class="c">${esc(r.v['償還起'])}－${esc(r.v['償還止'])}</td><td class="num">${fmt(r.borrow)}</td><td class="num">${fmt(r.repay)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="small">無</p>'}</section>`;
   $('out').innerHTML=`<section class="card"><h2>${n.year}年度較${o.year}年度有差異之借款項目（${cnt}）</h2><p class="small">共解析 ${o.year} 年度 ${o.rows.length} 項、${n.year} 年度 ${n.rows.length} 項。比對欄位：債權人、借款年度、償還期間（起、止）。<del>刪除</del>　<ins>新增</ins></p>
   <div class="wrap"><table class="chg"><thead><tr><th style="width:34%">借款項目</th><th style="width:16%">欄位</th><th>${o.year}年度</th><th>${n.year}年度</th></tr></thead><tbody>${h||'<tr><td colspan="4">無差異</td></tr>'}</tbody></table></div></section>`
   +list(`${n.year}年度新列借款項目`,add)+list(`${o.year}年度有、${n.year}年度未列借款項目`,gone);
 }
 
+// 匯出 Excel：每個結果表一個工作表（合併儲存格照表格的 rowspan）
+function exportXlsx(name){
+  const wb=XLSX.utils.book_new();
+  document.querySelectorAll('#out section').forEach((s,i)=>{const t=s.querySelector('table'); if(!t) return;
+    const nm=(s.querySelector('h2').textContent.replace(/（[^）]*）/g,'').replace(/[\\/?*\[\]:]/g,'').slice(0,31)||'表'+(i+1));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.table_to_sheet(t),nm);});
+  XLSX.writeFile(wb,name+'.xlsx');
+}
 const ready=()=>$('go').disabled=!($('fa').files[0]&&$('fb').files[0]);
 $('fa').onchange=$('fb').onchange=ready;
 document.querySelectorAll('label.f').forEach(l=>{const inp=l.querySelector('input');
@@ -117,6 +126,7 @@ $('go').onclick=async()=>{
     let [a,b]=await Promise.all([$('fa'),$('fb')].map(async e=>parse(await e.files[0].arrayBuffer())));
     if(+a.year>+b.year)[a,b]=[b,a];
     report(a,b); $('msg').textContent='';
+    $('xl').hidden=false; $('xl').onclick=()=>exportXlsx(`長期債務項目核對_${a.year}-${b.year}`);
   }catch(e){$('msg').textContent='解析失敗：'+e.message;console.error(e);}
 };
 </script></body></html>

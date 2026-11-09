@@ -16,7 +16,7 @@ ins{background:var(--add);text-decoration:none}del{background:var(--del)}.wrap{o
 <section class="card in"><h2>上傳 PDF 或 Excel</h2><div class="drop">
 <label class="f">上年度 PDF／Excel<small>拖曳檔案到這裡，或點選選擇</small><input type="file" id="fa" accept=".pdf,.xls,.xlsx"></label>
 <label class="f">新年度 PDF／Excel<small>拖曳檔案到這裡，或點選選擇</small><input type="file" id="fb" accept=".pdf,.xls,.xlsx"></label></div>
-<button id="go" disabled>開始核對</button> <span id="msg" class="small"></span>
+<button id="go" disabled>開始核對</button> <button id="xl" hidden>匯出 Excel</button> <span id="msg" class="small"></span>
 <p class="small">檔案只在瀏覽器內解析，不會上傳。PDF 與 Excel（.xls／.xlsx）皆可，兩年度可混用。支援非營業特種基金（資金來源：營運資金、國庫撥補、外借資金、其他）及營業基金（營運資金、出售不適用資產、增資、其他、外借資金）兩種格式，自動判斷。比對範圍為各基金「繼續計畫」及「新興計畫」下的個別計畫，以「主管＋基金＋計畫名稱」配對；年度由表頭「○○○年度」自動判斷。</p></section>
 <div id="out"></div></main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -159,8 +159,8 @@ function report(o,n){
     if(!ch.length&&!tc&&!nc&&!pc) continue; cnt++;
     const g=r.m+'｜'+r.f; if(g!==grp){grp=g;h+=`<tr class="grp"><td colspan="5">${esc(r.m)}　${esc(r.f)}</td></tr>`;}
     const rs=ch.length+(tc?1:0)+(nc?1:0)+(pc?1:0); let first=true;
-    if(nc){const [A,B]=diff(p.plan,r.plan);h+=`<tr>${(first=false,`<td rowspan="${rs}">${esc(r.plan)}<div class="small">${o.year}：${esc(p.c)} → ${n.year}：${esc(r.c)}</div></td>`)}<td>計畫名稱</td><td>${A}</td><td>${B}</td><td></td></tr>`;}
-    const pre=()=>{const s=first?`<td rowspan="${rs}">${esc(r.plan)}<div class="small">${o.year}：${esc(p.c)} → ${n.year}：${esc(r.c)}</div></td>`:'';first=false;return s;};
+    if(nc){const [A,B]=diff(p.plan,r.plan);h+=`<tr>${(first=false,`<td rowspan="${rs}">${esc(r.plan)}<br><span class="small">${o.year}：${esc(p.c)} → ${n.year}：${esc(r.c)}</span></td>`)}<td>計畫名稱</td><td>${A}</td><td>${B}</td><td></td></tr>`;}
+    const pre=()=>{const s=first?`<td rowspan="${rs}">${esc(r.plan)}<br><span class="small">${o.year}：${esc(p.c)} → ${n.year}：${esc(r.c)}</span></td>`:'';first=false;return s;};
     ch.forEach(k=>{const a=p.v[k]||0,b=r.v[k]||0,d=b-a;
       h+=`<tr>${pre()}<td>${k==='投資總額'?'投資總額（總經費）':'資金來源－'+k}</td><td class="amt"><span>${fmt(a)}</span></td><td class="amt"><span>${fmt(b)}</span></td><td class="amt ${d>0?'up':'dn'}"><span>${d>0?'+':''}${fmt(d)}</span></td></tr>`;});
     if(pc){const [A,B]=diff(pn(p.per),pn(r.per));h+=`<tr>${pre()}<td>計畫期間（進度起迄）</td><td class="amt">${A}</td><td class="amt">${B}</td><td></td></tr>`;}
@@ -171,10 +171,18 @@ function report(o,n){
   $('out').innerHTML=`<section class="card"><h2>${n.year}年度較${o.year}年度修正之計畫（${cnt}）</h2><p class="small">共解析 ${o.year} 年度 ${o.rows.length} 個、${n.year} 年度 ${n.rows.length} 個計畫。單位：新臺幣千元。<del>刪除</del>　<ins>新增</ins></p>
   <div class="wrap"><table class="chg"><thead><tr><th style="width:22%">計畫</th><th style="width:14%">項目</th><th>${o.year}年度</th><th>${n.year}年度</th><th class="num">增減</th></tr></thead><tbody>${h||'<tr><td colspan="5">無修正</td></tr>'}</tbody></table></div></section>`
   +`<section class="card"><h2>累計編列數勾稽（${cm.length?`不符 ${cm.length} 個`:'全部相符'}）</h2><p class="small">${n.year}年度「截至本年度累計」應等於${o.year}年度「截至本年度累計」＋${n.year}年度「本年度」編列數。共勾稽 ${cmN} 個兩年度皆列之計畫。單位：新臺幣千元。</p>`
-  +(cm.length?`<div class="wrap"><table class="chg"><thead><tr><th>主管／基金</th><th>計畫</th><th>${o.year}年度累計</th><th>${n.year}年度編列</th><th>應為</th><th>${n.year}年度累計</th><th>差額</th></tr></thead><tbody>${cm.map(([r,p])=>{const e=p.cum+r.cur,d=r.cum-e;return `<tr><td>${esc(r.m)}<div class="small">${esc(r.f)}</div></td><td>${esc(r.plan)}</td><td class="amt"><span>${fmt(p.cum)}</span></td><td class="amt"><span>${fmt(r.cur)}</span></td><td class="amt"><span>${fmt(e)}</span></td><td class="amt"><span>${fmt(r.cum)}</span></td><td class="amt ${d>0?'up':'dn'}"><span>${d>0?'+':''}${fmt(d)}</span></td></tr>`}).join('')}</tbody></table></div>`:'')+`</section>`
+  +(cm.length?`<div class="wrap"><table class="chg"><thead><tr><th>主管／基金</th><th>計畫</th><th>${o.year}年度累計</th><th>${n.year}年度編列</th><th>應為</th><th>${n.year}年度累計</th><th>差額</th></tr></thead><tbody>${cm.map(([r,p])=>{const e=p.cum+r.cur,d=r.cum-e;return `<tr><td>${esc(r.m)}<br><span class="small">${esc(r.f)}</span></td><td>${esc(r.plan)}</td><td class="amt"><span>${fmt(p.cum)}</span></td><td class="amt"><span>${fmt(r.cur)}</span></td><td class="amt"><span>${fmt(e)}</span></td><td class="amt"><span>${fmt(r.cum)}</span></td><td class="amt ${d>0?'up':'dn'}"><span>${d>0?'+':''}${fmt(d)}</span></td></tr>`}).join('')}</tbody></table></div>`:'')+`</section>`
   +list(`${n.year}年度新列計畫`,add,n.year)+list(`${o.year}年度有、${n.year}年度未列計畫（已完成、更名或移列）`,gone,o.year);
 }
 
+// 匯出 Excel：每個結果表一個工作表（合併儲存格照表格的 rowspan）
+function exportXlsx(name){
+  const wb=XLSX.utils.book_new();
+  document.querySelectorAll('#out section').forEach((s,i)=>{const t=s.querySelector('table'); if(!t) return;
+    const nm=(s.querySelector('h2').textContent.replace(/（[^）]*）/g,'').replace(/[\\/?*\[\]:]/g,'').slice(0,31)||'表'+(i+1));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.table_to_sheet(t),nm);});
+  XLSX.writeFile(wb,name+'.xlsx');
+}
 const ready=()=>$('go').disabled=!($('fa').files[0]&&$('fb').files[0]);
 $('fa').onchange=$('fb').onchange=ready;
 // 拖曳區：檔案放進框裡就塞進對應的 input
@@ -190,6 +198,7 @@ $('go').onclick=async()=>{
     let [a,b]=await Promise.all([$('fa'),$('fb')].map(e=>load(e.files[0])));
     if(+a.year>+b.year)[a,b]=[b,a];
     report(a,b); $('msg').textContent='';
+    $('xl').hidden=false; $('xl').onclick=()=>exportXlsx(`固定資產計畫核對_${a.year}-${b.year}`);
   }catch(e){$('msg').textContent='解析失敗：'+e.message;console.error(e);}
 };
 </script></body></html>
