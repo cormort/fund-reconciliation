@@ -33,7 +33,7 @@ const fmt=n=>n.toLocaleString('en-US');
 
 // PDF：每列 11 個數字（9 欄專任＋管理會委員及顧問＋兼任），名稱換行接回上一列；主管列縮排較淺
 async function parsePdf(buf){
-  const doc=await pdfjsLib.getDocument({data:buf}).promise, rows=[]; let year='';
+  const doc=await pdfjsLib.getDocument({data:buf}).promise, rows=[]; let year='', note='';
   for(let p=1;p<=doc.numPages;p++){
     const pg=await doc.getPage(p),H=pg.getViewport({scale:1}).height;
     const raw=(await pg.getTextContent()).items.filter(i=>i.str.trim()||(i.str&&i.width<4)).map(i=>({x:i.transform[4],y:H-i.transform[5],w:i.width,t:fix(i.str)}))
@@ -42,11 +42,12 @@ async function parsePdf(buf){
     const T=its.map(i=>({...i,t:i.t.trim()})).filter(i=>i.t);
     const ym=T.map(i=>i.t).join('').match(/中華民國(\d{2,3})年度/); if(ym&&!year) year=ym[1];
     const lines=[]; T.forEach(i=>{const l=lines.find(l=>Math.abs(l.y-i.y)<=5); l?l.its.push(i):lines.push({y:i.y,its:[i]});});
-    lines.sort((a,b)=>a.y-b.y); let last=null;
+    lines.sort((a,b)=>a.y-b.y); let last=null, inNote=false;
     for(const {its:l} of lines){
+      if(inNote){note+=l.sort((a,b)=>a.x-b.x).map(i=>i.t).join('');continue;}
       l.sort((a,b)=>a.x-b.x);
       const nums=l.filter(i=>/^(\d{1,3}(,\d{3})*|-)$/.test(i.t)), name=l.filter(i=>!nums.includes(i)).map(i=>i.t).join('');
-      if(/^註/.test(name)) break;
+      if(/^註/.test(name)){inNote=true;note+=l.map(i=>i.t).join('');continue;}   // 表下註記另外收起來，用來判斷差額是否已說明
       if(nums.length>=9){last={x:l[0].x,name,v:nums.slice(0,9).map(i=>i.t==='-'?0:+i.t.replace(/,/g,''))}; rows.push(last);}
       else if(last&&!nums.length&&Math.abs(l[0].x-last.x)<15) last.name+=name;
     }
@@ -60,7 +61,7 @@ async function parsePdf(buf){
     f? f.v=f.v.map((x,i)=>x+r.v[i]) : funds.set(k,{m,name:nm,v:[...r.v],parts:0});
     funds.get(k).parts++;
   }
-  return {year,funds:[...funds.values()]};
+  return {year,note:norm(note),funds:[...funds.values()]};
 }
 
 // 一覽表：每列 12 個數字＝職員、警察、法警、駐警、工友、技工、駕駛、聘用一般、聘用當地專業、約僱、駐外雇員、合計
@@ -122,9 +123,10 @@ function report(P,X){
     let st,cls,src='',bad=F.map(()=>false),x=null;
     if(!hasFile(f.m,X.rows)){st='沒有檔案';cls='ng';}
     else{ const mt=match(f,X.rows);
-      if(!mt||mt.how==='zero'){st=f.v.every(v=>!v)?'一覽表未列（PDF 無專任員額）':'一覽表無此基金';cls=f.v.every(v=>!v)?'ok':'ng';}
+      if(!mt||mt.how==='zero'){const z=f.v.every(v=>!v), noted=!z&&P.note.includes(f.name); st=z?'一覽表未列（PDF 無專任員額）':noted?'一覽表無此基金，表下已註明（免修正）':'一覽表無此基金'; cls=z||noted?'ok':'ng';}
       else{ mt.rows.forEach(r=>used.add(r)); const fk=mt.rows[0].file; byFile[fk]=(byFile[fk]||F.map(()=>0)).map((s,i)=>s+f.v[i]);
-        x=mt.x; bad=F.map((_,i)=>f.v[i]!==x.v[i]); const any=bad.some(Boolean); st=any?'PDF 有誤':'相符'; cls=any?'ng':'ok';
+        x=mt.x; bad=F.map((_,i)=>f.v[i]!==x.v[i]); const any=bad.some(Boolean); const diff=x.v[8]-f.v[8], noted=any&&P.note.includes(f.name)&&P.note.includes(fmt(Math.abs(diff)).replace(/,/g,''));
+        st=!any?'相符':noted?'表下已註明（免修正）':'PDF 有誤'; cls=any&&!noted?'ng':'ok';
         const oth=any&&mt.other&&F.every((_,i)=>x.v[i]-f.v[i]===mt.other.v[i])?`；差額等於一覽表「${esc(mt.other.raw)}」列`:'';
         src=`${esc(x.raw)}<br><span class="small">${esc(x.file)}${mt.how==='num'?'（名稱不同，依人數對到）':''}${oth}</span>`; } }
     cnt[st]=(cnt[st]||0)+1;
@@ -132,19 +134,21 @@ function report(P,X){
     h+=`<tr><td>${esc(f.name)}${f.parts>1?'<br><span class="small">甲乙兩部分合併</span>':''}</td>${f.v.map((v,i)=>`<td class="n${bad[i]?' bad':''}">${fmt(v)}${bad[i]?`<br><span class="small">應為 ${fmt(x.v[i])}</span>`:''}</td>`).join('')}<td class="${cls}">${st}</td><td>${src}</td></tr>`;
   }
   $('out').innerHTML=`<section class="card"><h2>${P.year}年度員工人數核對（${Object.entries(cnt).map(([k,v])=>k.replace(/（.*）/,'')+' '+v).join('、')}）</h2><p class="small">列示依 PDF 的基金順序，正確數字以人事總處預算員額分配一覽表為準。一覽表共讀入 ${X.books} 個檔案、${X.rows.length} 列。紅底為 PDF 與一覽表不同的欄位，下方「應為」是一覽表的數字。</p>
-  <div class="wrap"><table><thead><tr><th>基金</th>${F.map(k=>`<th>${k}</th>`).join('')}<th>比對結果</th><th>一覽表來源</th></tr></thead><tbody>${h}</tbody></table></div></section>`+odsSide(X,used,byFile);
+  <div class="wrap"><table><thead><tr><th>基金</th>${F.map(k=>`<th>${k}</th>`).join('')}<th>比對結果</th><th>一覽表來源</th></tr></thead><tbody>${h}</tbody></table></div></section>`+odsSide(X,used,byFile,P.note)
+  +(P.note?`<section class="card"><h2>PDF 表下註記</h2><p class="small">${esc(P.note)}</p></section>`:'');
 }
 
 // 一覽表端：各部會「作業基金部分」合計（含特別收入基金）應等於 PDF 對到該檔案的基金合計，不等就是 PDF 少列或多列
-function odsSide(X,used,byFile){
+function odsSide(X,used,byFile,note=''){
   const parts=X.rows.filter(r=>/作業基金部分$/.test(r.raw)&&r.v[8]); let h='';
   for(const p of parts){
     const got=byFile[p.file]||F.map(()=>0); if(F.every((_,i)=>got[i]===p.v[i])) continue;
+    const noted=note.includes(String(p.v[8]-got[8]));   // 差額數字在表下註記出現（例：537人未計入）
     const left=X.rows.filter(r=>r.file===p.file&&r!==p&&!used.has(r)&&r.v[8]&&/基金/.test(r.raw)&&!/部分$/.test(r.raw));
-    EXP.side.push([p.raw.replace(/作業基金部分$/,''),p.file,p.v[8],got[8],p.v[8]-got[8],left.map(r=>`${r.raw}：${r.v[8]}`).join('；')]);
-    h+=`<tr><td>${esc(p.raw.replace(/作業基金部分$/,''))}<br><span class="small">${esc(p.file)}</span></td><td class="n">${fmt(p.v[8])}</td><td class="n">${fmt(got[8])}</td><td class="n bad">${fmt(p.v[8]-got[8])}</td><td>${left.map(r=>`${esc(r.raw)}：${fmt(r.v[8])}`).join('<br>')||'—'}</td></tr>`;
+    EXP.side.push([p.raw.replace(/作業基金部分$/,''),p.file,p.v[8],got[8],p.v[8]-got[8],noted?'表下已註明（免修正）':'待確認',left.map(r=>`${r.raw}：${r.v[8]}`).join('；')]);
+    h+=`<tr><td>${esc(p.raw.replace(/作業基金部分$/,''))}<br><span class="small">${esc(p.file)}</span></td><td class="n">${fmt(p.v[8])}</td><td class="n">${fmt(got[8])}</td><td class="n${noted?'':' bad'}">${fmt(p.v[8]-got[8])}</td><td class="${noted?'ok':'ng'}">${noted?'表下已註明（免修正）':'待確認'}</td><td>${left.map(r=>`${esc(r.raw)}：${fmt(r.v[8])}`).join('<br>')||'—'}</td></tr>`;
   }
-  return `<section class="card"><h2>一覽表有、PDF 未列或人數不足（${h?'有差異':'無'}）</h2><p class="small">各部會一覽表「作業基金部分」合計（含特別收入基金）與 PDF 中對到該部會檔案的基金合計比較；營業、非營業 PDF 請一起上傳，否則另一類的基金會被列為未列。</p>${h?`<div class="wrap"><table><thead><tr><th>部會</th><th>一覽表作業基金部分合計</th><th>PDF 對到合計</th><th>差額</th><th>一覽表中未對到的基金列</th></tr></thead><tbody>${h}</tbody></table></div>`:''}</section>`;
+  return `<section class="card"><h2>一覽表有、PDF 未列或人數不足（${h?'有差異':'無'}）</h2><p class="small">各部會一覽表「作業基金部分」合計（含特別收入基金）與 PDF 中對到該部會檔案的基金合計比較；營業、非營業 PDF 請一起上傳，否則另一類的基金會被列為未列。</p>${h?`<div class="wrap"><table><thead><tr><th>部會</th><th>一覽表作業基金部分合計</th><th>PDF 對到合計</th><th>差額</th><th>結果</th><th>一覽表中未對到的基金列</th></tr></thead><tbody>${h}</tbody></table></div>`:''}</section>`;
 }
 
 // 匯出：由比對資料直接產生（數字是數值），PDF 與一覽表各 9 欄並列，另列不符欄位
@@ -152,7 +156,7 @@ let EXP={main:[],side:[]};
 function exportXlsx(name){
   const wb=XLSX.utils.book_new(), ws=XLSX.utils.aoa_to_sheet([['主管','基金',...F.map(k=>'PDF '+k),...F.map(k=>'一覽表 '+k),'比對結果','不符欄位','一覽表對應列','一覽表檔案','說明'],...EXP.main]);
   ws['!autofilter']={ref:ws['!ref']}; XLSX.utils.book_append_sheet(wb,ws,'逐基金比對');
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['部會','一覽表檔案','一覽表作業基金部分合計','PDF 對到合計','差額','一覽表中未對到的基金列'],...EXP.side]),'一覽表有PDF未列');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['部會','一覽表檔案','一覽表作業基金部分合計','PDF 對到合計','差額','結果','一覽表中未對到的基金列'],...EXP.side]),'一覽表有PDF未列');
   XLSX.writeFile(wb,name+'.xlsx');
 }
 const ready=()=>$('go').disabled=!($('fa').files[0]&&$('fb').files.length);
@@ -166,7 +170,7 @@ $('go').onclick=async()=>{
   $('msg').textContent='解析中…';
   try{
     const [Ps,X]=await Promise.all([Promise.all([...$('fa').files].map(async f=>parsePdf(await f.arrayBuffer()))),readBooks([...$('fb').files])]);
-    const P={year:Ps[0].year,funds:Ps.flatMap(p=>p.funds)};
+    const P={year:Ps[0].year,note:Ps.map(p=>p.note).join(''),funds:Ps.flatMap(p=>p.funds)};
     report(P,X); $('msg').textContent='';
     $('xl').hidden=false; $('xl').onclick=()=>exportXlsx(`員工人數核對_${P.year}`);
   }catch(e){$('msg').textContent='解析失敗：'+e.message;console.error(e);}
