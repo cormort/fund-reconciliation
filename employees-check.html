@@ -123,10 +123,11 @@ function report(P,X){
     let st,cls,src='',bad=F.map(()=>false),x=null;
     if(!hasFile(f.m,X.rows)){st='沒有檔案';cls='ng';}
     else{ const mt=match(f,X.rows);
-      if(!mt||mt.how==='zero'){const z=f.v.every(v=>!v), noted=!z&&P.note.includes(f.name); st=z?'一覽表未列（PDF 無專任員額）':noted?'一覽表無此基金，表下已註明（免修正）':'一覽表無此基金'; cls=z||noted?'ok':'ng';}
+      if(!mt||mt.how==='zero'){const z=f.v.every(v=>!v), noted=!z&&P.note.includes(f.name); st=z&&P.note.includes(f.name)?'一覽表未列，但表下有註記（請確認註記）':z?'一覽表未列（PDF 無專任員額）':noted?'一覽表無此基金，表下已註明（免修正）':'一覽表無此基金'; cls=(z&&!P.note.includes(f.name))||noted?'ok':'ng';}
       else{ mt.rows.forEach(r=>used.add(r)); const fk=mt.rows[0].file; byFile[fk]=(byFile[fk]||F.map(()=>0)).map((s,i)=>s+f.v[i]);
         x=mt.x; bad=F.map((_,i)=>f.v[i]!==x.v[i]); const any=bad.some(Boolean); const diff=x.v[8]-f.v[8], noted=any&&P.note.includes(f.name)&&P.note.includes(fmt(Math.abs(diff)).replace(/,/g,''));
-        st=!any?'相符':noted?'表下已註明（免修正）':'PDF 有誤'; cls=any&&!noted?'ng':'ok';
+        const stale=!any&&P.note.includes(f.name);   // 正常有差額才會備註；相符卻被註記點名，註記可能過時
+        st=stale?'相符，但表下有註記（請確認註記）':!any?'相符':noted?'表下已註明（免修正）':'PDF 有誤'; cls=(any&&!noted)||stale?'ng':'ok';
         const oth=any&&mt.other&&F.every((_,i)=>x.v[i]-f.v[i]===mt.other.v[i])?`；差額等於一覽表「${esc(mt.other.raw)}」列`:'';
         src=`${esc(x.raw)}<br><span class="small">${esc(x.file)}${mt.how==='num'?'（名稱不同，依人數對到）':''}${oth}</span>`; } }
     cnt[st]=(cnt[st]||0)+1;
