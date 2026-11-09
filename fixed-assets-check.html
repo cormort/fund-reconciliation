@@ -17,12 +17,11 @@ ins{background:var(--add);text-decoration:none}del{background:var(--del)}.wrap{o
 <label class="f">上年度 PDF<input type="file" id="fa" accept=".pdf"></label>
 <label class="f">新年度 PDF<input type="file" id="fb" accept=".pdf"></label></div>
 <button id="go" disabled>開始核對</button> <span id="msg" class="small"></span>
-<p class="small">檔案只在瀏覽器內解析，不會上傳。比對範圍為各基金「繼續計畫」及「新興計畫」下的個別計畫，以「主管＋基金＋計畫名稱」配對；年度由表頭「○○○年度」自動判斷。</p></section>
+<p class="small">檔案只在瀏覽器內解析，不會上傳。支援非營業特種基金（資金來源：營運資金、國庫撥補、外借資金、其他）及營業基金（營運資金、出售不適用資產、增資、其他、外借資金）兩種格式，自動判斷。比對範圍為各基金「繼續計畫」及「新興計畫」下的個別計畫，以「主管＋基金＋計畫名稱」配對；年度由表頭「○○○年度」自動判斷。</p></section>
 <div id="out"></div></main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const F=['投資總額','營運資金','國庫撥補','外借資金','其他'];
 const $=id=>document.getElementById(id), esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 const norm=s=>s.replace(/\s+/g,'');
 // 部分 PDF 用部首字代替一般漢字（⾦、⺠、⻑）：NFKC 處理康熙部首，補充部首另外對照
@@ -35,29 +34,37 @@ const fmt=n=>n.toLocaleString('en-US');
 // 對開表：奇數頁＝基金及計畫名稱＋投資總額／資金來源，偶數頁＝計畫內容、進度、預算數
 async function parse(buf){
   const doc=await pdfjsLib.getDocument({data:buf}).promise, out=[];
-  let year='', cur={m:'',f:'',c:''}, last=null;
+  let year='', cur={m:'',f:'',c:''}, last=null, biz=false;
   const items=async p=>{const pg=await doc.getPage(p),H=pg.getViewport({scale:1}).height;
-    const its=(await pg.getTextContent()).items.filter(i=>i.str.trim()).map(i=>({x:i.transform[4],y:H-i.transform[5],w:i.width,t:fix(i.str.trim())}))
-      .sort((a,b)=>Math.abs(a.y-b.y)>3?a.y-b.y:a.x-b.x), out=[];
+    const its=(await pg.getTextContent()).items.filter(i=>i.str.trim()||(i.str&&i.width<4)).map(i=>({x:i.transform[4],y:H-i.transform[5],w:i.width,t:fix(i.str)}))
+      .sort((a,b)=>Math.abs(a.y-b.y)>5?a.y-b.y:a.x-b.x), out=[];
     // 有的 PDF 把一個詞拆成好幾段（「外借資」＋「金」），同列且緊貼的段落先併回來
     for(const i of its){const p=out[out.length-1];
-      if(p&&Math.abs(p.y-i.y)<=3&&i.x-(p.x+p.w)<1.5&&i.x>p.x){p.t+=i.t;p.w=i.x+i.w-p.x;} else out.push({...i});}
-    return out;};
+      if(p&&Math.abs(p.y-i.y)<=5&&i.x-(p.x+p.w)<1.5&&i.x>p.x){p.t+=i.t;p.w=i.x+i.w-p.x;} else out.push({...i});}
+    return out.map(i=>({...i,t:i.t.trim()})).filter(i=>i.t);};   // 空白段落也參與合併，否則「年 117」之類會斷開
+  // 第一輪：逐版取字，數字欄位要整份一起判斷（某一版可能整欄空白）
+  const SP=[];
   for(let p=1;p+1<=doc.numPages;p+=2){
     const L=await items(p), R=await items(p+1);
-    const ym=R.map(i=>i.t).join('').match(/(\d{2,3})年度/); if(ym&&!year) year=ym[1];
-    const hd=Object.fromEntries(F.map(k=>[k,L.find(i=>norm(i.t)===k)]));
-    if(!hd['投資總額']) continue;                       // 不是這種表的頁
-    const nameR=hd['投資總額'].x-15, top=hd['營運資金'].y+6;
-    const jin=R.find(i=>i.t==='進'), contR=jin?jin.x-2:165;
-    const body=L.filter(i=>i.y>top), nums=body.filter(i=>i.x>=nameR&&isNum(i.t)), names=body.filter(i=>i.x<nameR);
-    // 數字靠右對齊：右緣聚成 5 群，由左至右對應 5 欄（用表頭中心判斷會把「-」歸錯欄）
-    const ends=[]; nums.map(n=>n.x+n.w).sort((a,b)=>a-b).forEach(e=>{const g=ends[ends.length-1]; if(g&&e-g.at(-1)<4) g.push(e); else ends.push([e]);});
-    const cols=ends.filter(g=>g.length>1).map(g=>g.at(-1));
-    if(cols.length!==F.length) throw Error(`第 ${p} 頁欄位辨識失敗（找到 ${cols.length} 欄）`);
+    const ym=R.concat(L).map(i=>i.t).join('').match(/(\d{2,3})年度/); if(ym&&!year) year=ym[1];
+    const ying=L.find(i=>/^營/.test(norm(i.t))); if(!ying) continue;     // 表頭最末列「營運資金」
+    const top=ying.y+6, body=L.filter(i=>i.y>top), nums=body.filter(i=>i.x>100&&isNum(i.t));
+    if(!nums.length) continue;
+    const nameR=Math.min(...nums.map(n=>n.x))-2;
+    const dates=R.filter(i=>/^\d{2,3}\.\d{1,2}-\d/.test(i.t)), contR=dates.length?Math.min(...dates.map(i=>i.x))-1:165;
+    if(/出售不適用/.test(L.map(i=>i.t).join(''))) biz=true;
+    SP.push({p,nums,names:body.filter(i=>i.x<nameR),cont:R.filter(i=>i.x<contR&&i.y>top)});
+  }
+  const F=biz
+    ? ['投資總額','營運資金','出售不適用資產','增資','其他','外借資金']    // 營業基金
+    : ['投資總額','營運資金','國庫撥補','外借資金','其他'];              // 非營業特種基金
+  // 數字靠右對齊：右緣聚成幾群，由左至右對應各欄（用表頭中心判斷會把「-」歸錯欄）
+  const ends=[]; SP.flatMap(s=>s.nums).map(n=>n.x+n.w).sort((a,b)=>a-b).forEach(e=>{const g=ends[ends.length-1]; if(g&&e-g.at(-1)<4) g.push(e); else ends.push([e]);});
+  const cols=ends.filter(g=>g.length>2).map(g=>g.at(-1));
+  if(cols.length!==F.length) throw Error(`欄位辨識失敗：應有 ${F.length} 欄，找到 ${cols.length} 欄`);
+  const textIn=(arr,a,b)=>arr.filter(i=>i.y>=a&&i.y<b).sort((u,v)=>Math.abs(u.y-v.y)>5?u.y-v.y:u.x-v.x).map(i=>i.t).join('');
+  for(const {nums,names,cont} of SP){
     const ys=[...new Set(names.filter(n=>nums.some(v=>Math.abs(v.y-n.y)<4)).map(n=>Math.round(n.y)))].sort((a,b)=>a-b);
-    const cont=R.filter(i=>i.x<contR&&i.y>top);
-    const textIn=(arr,a,b)=>arr.filter(i=>i.y>=a&&i.y<b).sort((u,v)=>Math.abs(u.y-v.y)>3?u.y-v.y:u.x-v.x).map(i=>i.t).join('');
     // 跨頁：本版第一個錨點之前的文字接回上一筆
     if(last){ const y0=ys.length?ys[0]-4:1e9; last.name+=textIn(names,0,y0); last.text+=textIn(cont,0,y0); }
     ys.forEach((y,k)=>{
@@ -72,8 +79,8 @@ async function parse(buf){
       last={m:cur.m,f:cur.f,c:cur.c,name,v,text:textIn(cont,y-4,nx)}; out.push(last);
     });
   }
-  out.forEach(r=>{r.plan=norm(r.name).replace(/[（(][一二三四五六七八九十]+[）)]/g,'');/* 序號有時被排進名稱中間 */r.text=norm(r.text);});
-  return {year,rows:out};
+  out.forEach(r=>{r.plan=norm(r.name).replace(/[（(][一二三四五六七八九十]+[）)]/g,'').replace(/^\d+\./,'');/* 序號有時被排進名稱中間；營業基金用「1.」 */r.text=norm(r.text);});
+  return {year,F,rows:out};
 }
 
 // 字元級 LCS 差異：計畫內容通常只改幾個數字，整段並列看不出來
@@ -91,15 +98,17 @@ function diff(a,b){
 
 const lcs=(a,b)=>{let d=new Uint16Array(b.length+1);for(const c of a){let pr=0;for(let j=1;j<=b.length;j++){const t=d[j];d[j]=c===b[j-1]?pr+1:Math.max(d[j],d[j-1]);pr=t;}}return d[b.length];};
 function report(o,n){
+  if(o.F.join()!==n.F.join()) throw Error('兩個檔案的表格格式不同（營業／非營業基金）');
+  const F=n.F;
   const key=r=>norm(r.m)+'|'+norm(r.f)+'|'+r.plan, om=new Map(o.rows.map(r=>[key(r),r]));
   let h='',cnt=0,grp='';
   const add=[],seen=new Set();
-  // 名稱小幅修改（汙／污、錯字更正）：同主管同基金、名稱相似度 ≥ 85% 視為同一計畫
+  // 名稱小幅修改（汙／污、錯字更正）：同主管同基金、名稱相似度 ≥ 85%，或一方名稱包含另一方（加註期程）視為同一計畫
   const fb=r=>o.rows.filter(p=>!om.has('*'+key(p))&&p.m===r.m&&p.f===r.f&&!n.rows.some(q=>key(q)===key(p)))
-    .map(p=>[p,2*lcs(p.plan,r.plan)/(p.plan.length+r.plan.length)]).filter(x=>x[1]>=.85).sort((a,b)=>b[1]-a[1])[0]?.[0];
+    .map(p=>[p,Math.min(p.plan.length,r.plan.length)>=6&&(p.plan.includes(r.plan)||r.plan.includes(p.plan))?1:2*lcs(p.plan,r.plan)/(p.plan.length+r.plan.length)]).filter(x=>x[1]>=.85).sort((a,b)=>b[1]-a[1])[0]?.[0];
   for(const r of n.rows){
     let p=om.get(key(r));
-    if(!p&&(p=fb(r))) om.set('*'+key(p),1);
+    if(!p&&r.c!=='新興計畫'&&(p=fb(r))) om.set('*'+key(p),1);   // 新興計畫本來就是新案，不做名稱相似配對（第一期／第二期）
     if(!p){add.push(r);continue;} seen.add(key(p));
     const ch=F.filter(k=>(p.v[k]||0)!==(r.v[k]||0)), tc=p.text!==r.text, nc=p.plan!==r.plan;
     if(!ch.length&&!tc&&!nc) continue; cnt++;
