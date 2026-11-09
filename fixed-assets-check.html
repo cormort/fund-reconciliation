@@ -7,7 +7,7 @@ main{padding:20px 16px 50px}.card{background:#fff;border:1px solid #e2e8ed;borde
 label.f{display:block;border:2px dashed #9fb1c0;border-radius:10px;padding:14px;cursor:pointer}label.f input{display:block;margin-top:6px;max-width:100%}label.f.over{border-color:var(--b);background:#eaf3f8}label.f small{display:block;color:#667784}
 button{border:0;background:var(--n);color:#fff;padding:9px 16px;border-radius:8px;cursor:pointer;font-weight:700;margin-top:12px}button:disabled{opacity:.5}
 table{width:100%;border-collapse:collapse;font-size:.9rem}th{background:var(--n);color:#fff;text-align:center;padding:8px;position:sticky;top:0}td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
-.num{text-align:right;white-space:nowrap}td.amt{text-align:center;white-space:nowrap}td.amt span{display:inline-block;min-width:9em;text-align:right;font-variant-numeric:tabular-nums}th.num{text-align:center}.grp td{background:#eaf3f8;font-weight:700;color:var(--n)}.small{color:#667784;font-size:.86rem}
+.num{text-align:right;white-space:nowrap}table.chg td:nth-last-child(4){white-space:nowrap}td.amt{text-align:center;white-space:nowrap}td.amt span{display:inline-block;min-width:9em;text-align:right;font-variant-numeric:tabular-nums}th.num{text-align:center}.grp td{background:#eaf3f8;font-weight:700;color:var(--n)}.small{color:#667784;font-size:.86rem}
 ins{background:var(--add);text-decoration:none}del{background:var(--del)}.wrap{overflow-x:auto}.up{color:#a33}.dn{color:#3f7d2c}
 @media(max-width:700px){.drop{grid-template-columns:1fr}}@media print{header,.card.in{display:none}th{position:static}}
 </style></head><body>
@@ -157,7 +157,7 @@ function report(o,n){
   const gone=o.rows.filter(r=>!seen.has(key(r)));
   const list=(t,a,y)=>a.length?`<section class="card"><h2>${t}（${a.length}）</h2><div class="wrap"><table><thead><tr><th>主管</th><th>基金</th><th>計畫</th><th>${y}年度類別</th><th class="num">投資總額</th></tr></thead><tbody>${a.map(r=>`<tr><td>${esc(r.m)}</td><td>${esc(r.f)}</td><td>${esc(r.plan)}</td><td>${esc(r.c)}</td><td class="num">${fmt(r.v['投資總額']||0)}</td></tr>`).join('')}</tbody></table></div></section>`:'';
   $('out').innerHTML=`<section class="card"><h2>${n.year}年度較${o.year}年度修正之計畫（${cnt}）</h2><p class="small">共解析 ${o.year} 年度 ${o.rows.length} 個、${n.year} 年度 ${n.rows.length} 個計畫。單位：新臺幣千元。<del>刪除</del>　<ins>新增</ins></p>
-  <div class="wrap"><table><thead><tr><th style="width:22%">計畫</th><th style="width:14%">項目</th><th>${o.year}年度</th><th>${n.year}年度</th><th class="num">增減</th></tr></thead><tbody>${h||'<tr><td colspan="5">無修正</td></tr>'}</tbody></table></div></section>`
+  <div class="wrap"><table class="chg"><thead><tr><th style="width:22%">計畫</th><th style="width:14%">項目</th><th>${o.year}年度</th><th>${n.year}年度</th><th class="num">增減</th></tr></thead><tbody>${h||'<tr><td colspan="5">無修正</td></tr>'}</tbody></table></div></section>`
   +list(`${n.year}年度新列計畫`,add,n.year)+list(`${o.year}年度有、${n.year}年度未列計畫（已完成、更名或移列）`,gone,o.year);
 }
 
