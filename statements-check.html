@@ -9,6 +9,7 @@ button{border:0;background:var(--n);color:#fff;padding:9px 16px;border-radius:8p
 table{width:100%;border-collapse:collapse;font-size:.88rem}th{background:var(--n);color:#fff;text-align:center;padding:6px;border:1px solid rgba(255,255,255,.25)}td{padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top}details td:first-child{white-space:nowrap}
 td.num{text-align:right;white-space:nowrap}td.bad{background:var(--bad)}td.tail{background:var(--tail)}.small{color:#667784;font-size:.86rem}.wrap{overflow-x:auto}
 .ok{color:#2e7d32;font-weight:700}.ng{color:#c62828;font-weight:700}details{margin-top:8px}summary{cursor:pointer;color:var(--b)}
+nav.tabs{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0}nav.tabs button{border:1px solid var(--line);background:#fff;color:var(--n);border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit}nav.tabs button.on{background:var(--n);color:#fff;border-color:var(--n)}nav.tabs button.on .ng{color:#ffcdd2}
 @media print{header,.card.in{display:none}}
 </style></head><body>
 <header><div><h1>報表數字檢誤</h1><p>上傳各基金的收支餘絀表、餘絀撥補表、基金來源用途及餘絀表、現金流量表 PDF，自動驗算合計、百分比及比較增減。<br><a href="index.html">← 回專區</a></p></div></header>
@@ -338,7 +339,11 @@ function render(){
   let h=`<section class="card"><h2>檢誤摘要</h2><p>共 ${RES.length} 張報表；錯誤 <span class="ng">${errN}</span>、尾差 ${tailN}。</p><div class="wrap"><table><tr><th>基金</th><th>報表</th><th>結果</th></tr>`;
   RES.forEach(r=>{const e=r.E.filter(x=>!x.tail).length,t=r.E.length-e; h+=`<tr><td>${esc(r.fund)}</td><td>${TYPES[r.type].t}</td><td>${!r.rows.length?'<span class="ng">未解析到資料</span>':e?`<span class="ng">錯誤 ${e}</span>`:'<span class="ok">通過</span>'}${t?`（尾差 ${t}）`:''}</td></tr>`;});
   h+='</table></div></section>';
-  RES.forEach(r=>{const T=TYPES[r.type];
+  /* 依屬性分頁：綜計表／基金別／散總／各基金 */
+  const TABS=['綜計表','基金別','散總','各基金'], used=TABS.map((_,g)=>RES.filter(r=>rk(r)===g)).map((a,g)=>[g,a]).filter(a=>a[1].length), on=used[0]?.[0];
+  h+=`<nav class="tabs">${used.map(([g,a])=>{const e=a.reduce((s,r)=>s+r.E.filter(x=>!x.tail).length,0); return `<button data-g="${g}" class="${g===on?'on':''}">${TABS[g]}（${a.length}）${e?`<span class="ng"> 錯誤 ${e}</span>`:''}</button>`;}).join('')}</nav>`;
+  let cur=-1;
+  RES.forEach(r=>{const T=TYPES[r.type]; if(rk(r)!==cur){ if(cur>=0) h+='</div>'; cur=rk(r); h+=`<div class="tp" data-g="${cur}"${cur===on?'':' hidden'}>`; }
     h+=`<section class="card"><h2>${esc(r.fund)}　${T.t}</h2>`;
     if(r.E.length){h+='<div class="wrap"><table><tr><th>項目</th><th>欄位</th><th>應為</th><th>實為</th><th>類別</th><th>驗算</th></tr>';
       r.E.forEach(e=>h+=`<tr><td>${esc(e.row.name)}</td><td>${e.col}</td><td class="num">${fmt(e.exp)}</td><td class="num">${fmt(e.act)}</td><td class="${e.tail?'':'ng'}">${e.tail?'尾差':'錯誤'}</td><td>${esc(e.why)}</td></tr>`);
@@ -347,6 +352,7 @@ function render(){
     h+=`<details><summary>解析結果（${r.rows.length} 列）</summary><div class="wrap"><table>${hdHtml(cs.map(c=>hd[c]),r.type==='of01'?'科目':r.type==='sf01'?'基金別':'項目')}`;
     r.rows.forEach(x=>h+=`<tr><td>${esc(x.name)}</td>${cs.map(c=>`<td class="num ${x.err?.[c]||''}">${esc(x.v[c]??'')}</td>`).join('')}</tr>`);
     h+='</table></div></details></section>';});
+  if(cur>=0) h+='</div>';
   $('out').innerHTML=h;
 }
 function exportXlsx(){
@@ -357,6 +363,8 @@ function exportXlsx(){
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['基金',k==='of01'?'科目':'項目',...TYPES[k].hd],...rs.flatMap(r=>r.rows.map(x=>[r.fund,x.name,...TYPES[k].hd.map((_,c)=>x.v[c]==null?'':x.v[c]==='-'?'-':num(x.v[c]))]))]),TYPES[k].t+(k==='sf01'?'（基金別）':''));}
   XLSX.writeFile(wb,'報表數字檢誤.xlsx');
 }
+$('out').onclick=e=>{const b=e.target.closest('.tabs button'); if(!b) return; const g=b.dataset.g;
+  $('out').querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b)); $('out').querySelectorAll('.tp').forEach(d=>d.hidden=d.dataset.g!==g);};
 const inp=$('fa'), lab=inp.closest('label'), ready=()=>$('go').disabled=!inp.files.length;
 inp.onchange=ready;
 lab.ondragover=e=>{e.preventDefault();lab.classList.add('over');}; lab.ondragleave=()=>lab.classList.remove('over');
