@@ -1,0 +1,172 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>報表數字檢誤</title><style>
+:root{--n:#17365d;--b:#2f75b5;--bg:#eef2f6;--line:#d8e0e7;--ink:#26343e;--bad:#f8d0d0;--tail:#fff2c2}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:"Microsoft JhengHei","Noto Sans TC",sans-serif;line-height:1.6}
+header{background:linear-gradient(135deg,#102a46,#2f75b5);color:#fff;padding:30px 16px}header div,main{max-width:1200px;margin:auto}h1{margin:0 0 6px}header a{color:#cfe3f5}
+main{padding:20px 16px 50px}.card{background:#fff;border:1px solid #e2e8ed;border-radius:14px;padding:20px;margin-bottom:18px}
+.card h2{color:var(--n);margin:0 0 12px;font-size:1.2rem}.card h3{color:var(--n);margin:16px 0 8px}
+label.f{display:block;border:2px dashed #9fb1c0;border-radius:10px;padding:14px;cursor:pointer}label.f input{display:block;margin-top:6px;max-width:100%}label.f.over{border-color:var(--b);background:#eaf3f8}label.f small{display:block;color:#667784}
+button{border:0;background:var(--n);color:#fff;padding:9px 16px;border-radius:8px;cursor:pointer;font-weight:700;margin-top:12px}button:disabled{opacity:.5}
+table{width:100%;border-collapse:collapse;font-size:.88rem}th{background:var(--n);color:#fff;text-align:center;padding:6px}td{padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+td.num{text-align:right;white-space:nowrap}td.bad{background:var(--bad)}td.tail{background:var(--tail)}.small{color:#667784;font-size:.86rem}.wrap{overflow-x:auto}
+.ok{color:#2e7d32;font-weight:700}.ng{color:#c62828;font-weight:700}details{margin-top:8px}summary{cursor:pointer;color:var(--b)}
+@media print{header,.card.in{display:none}}
+</style></head><body>
+<header><div><h1>報表數字檢誤</h1><p>上傳各基金的收支餘絀表、餘絀撥補表、現金流量表 PDF，自動驗算合計、百分比及比較增減。<br><a href="index.html">← 回專區</a></p></div></header>
+<main>
+<section class="card in"><h2>上傳 PDF</h2>
+<label class="f">報表 PDF（可多選，一個檔案可含多張報表）<small>拖曳檔案到這裡，或點選選擇</small><input type="file" id="fa" accept=".pdf" multiple></label>
+<button id="go" disabled>開始檢誤</button> <button id="xl" hidden>匯出 Excel</button> <span id="msg" class="small"></span>
+<p class="small">檔案只在瀏覽器內解析，不會上傳。依頁首標題自動判斷報表種類（OF-01 收支餘絀表、OF-02 餘絀撥補表、OF-03 現金流量表）。尾差容忍：前年度決算金額差 2 以內、百分比差 0.01 以內標黃色「尾差」，其餘差異標紅色「錯誤」。</p></section>
+<div id="out"></div></main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const $=id=>document.getElementById(id), esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const RAD={'⺠':'民','⻑':'長','⻄':'西','⻘':'青','⻝':'食','⻩':'黃','⻆':'角','⻭':'齒','⻯':'龍','⻜':'飛','⺟':'母','⻤':'鬼','⻣':'骨'};
+const fix=s=>s.normalize('NFKC').replace(/[⺀-⻿]/g,c=>RAD[c]||c);
+const isVal=s=>/^-?[\d,]+(\.\d+)?$|^-$/.test(s), num=s=>s==null||s==='-'||s===''?0:+s.replace(/,/g,'');
+const fmt=n=>typeof n==='number'?n.toLocaleString('en-US',{maximumFractionDigits:2}):n;
+// 四捨五入到 0.01（整數運算避免浮點誤差）
+const pct=(a,b)=>{const A=BigInt(Math.round(a)),B=BigInt(Math.round(b)),s=(A<0n)!==(B<0n)?-1:1,aa=A<0n?-A:A,bb=B<0n?-B:B;return s*Number((2n*aa*10000n+bb)/(2n*bb))/100;};
+
+const TYPES={of01:{t:'收支餘絀表',hd:['本年度預算金額','本年度預算%','上年度預算金額','上年度預算%','前年度決算金額','前年度決算%','比較增減金額','比較增減%'],start:/^業務收入/,end:/^本期賸餘\(短絀\)/},
+  of02:{t:'餘絀撥補表',hd:['本年度預算金額','本年度預算%','上年度預算金額','上年度預算%','比較增減金額','比較增減%'],start:/^(賸餘|短絀)之部/,end:/^待填補之短絀$/},
+  of03:{t:'現金流量表',hd:['金額'],start:/^(業務|營業)活動之現金流量/,end:/^期末現金及約當現金/}};
+const SKIP=/中華民國|單位:|^科目|^項目|^金額|本年度|上年度|前年度|比較增減|備註$/;
+
+async function parse(buf){
+  const doc=await pdfjsLib.getDocument({data:buf}).promise, reps={};
+  for(let p=1;p<=doc.numPages;p++){
+    const pg=await doc.getPage(p), H=pg.getViewport({scale:1}).height;
+    const raw=(await pg.getTextContent()).items.filter(i=>i.str.trim()||(i.str&&i.width<4))
+      .map(i=>({x:i.transform[4],y:H-i.transform[5],w:i.width,t:fix(i.str)})).sort((a,b)=>Math.abs(a.y-b.y)>3?a.y-b.y:a.x-b.x), its=[];
+    for(const i of raw){const q=its[its.length-1];
+      if(its.some(j=>j.t0===i.t&&Math.abs(j.x0-i.x)<1&&Math.abs(j.y-i.y)<1)) continue; i.t0=i.t; i.x0=i.x;   /* 粗體疊印的重複文字 */ if(q&&Math.abs(q.y-i.y)<=3&&i.x-(q.x+q.w)<1.5&&i.x>q.x){q.t+=i.t;q.w=i.x+i.w-q.x;} else its.push({...i});}
+    const lines=[]; its.forEach(i=>{i.t=i.t.trim(); if(!i.t)return; const l=lines.find(l=>Math.abs(l.y-i.y)<=3); l?l.its.push(i):lines.push({y:i.y,its:[i]});});
+    lines.sort((a,b)=>a.y-b.y).forEach(l=>l.its.sort((a,b)=>a.x-b.x));
+    const head=lines.slice(0,3).map(l=>l.its.map(i=>i.t).join('')).join('').replace(/\s/g,'');
+    const type=Object.keys(TYPES).find(k=>head.includes(TYPES[k].t)); if(!type) continue;
+    const T=TYPES[type], fund=head.split(T.t)[0].replace(/\s/g,''), key=fund+'|'+type;
+    const rep=reps[key]||(reps[key]={fund,type,rows:[]}); let on=rep.rows.length>0, done=false, pend='';
+    for(const {its:l} of lines.slice(1)){
+      if(done) break;
+      const k=l.findIndex(i=>isVal(i.t)), name=(k<0?l:l.slice(0,k)).map(i=>i.t).join('').replace(/\s/g,'').replace(/^營業活動/,'業務活動');
+      const v=k<0?[]:l.slice(k).map(i=>i.t).filter(isVal);
+      if(!on){ if(!T.start.test(name)) continue; on=true; }
+      if(SKIP.test(name)&&!v.length) continue;
+      if(/^註/.test(name)) break;
+      const prev=rep.rows[rep.rows.length-1];
+      // 換行科目（追溯適用及追溯重編之／影響數）：結尾「之」的半句接到下一列，其餘接到上一列
+      // ponytail: 只靠「之」結尾判斷前半句，遇到其他換行樣式再補
+      if(!v.length&&type==='of02'&&!/之部$/.test(name)){ if(/之$/.test(name)) pend=name; else if(prev) prev.name+=name; continue; }
+      rep.rows.push({name:pend+name,v}); pend=''; if(T.end.test(name)) done=true;
+    }
+  }
+  return Object.values(reps);
+}
+
+// ---- 驗算 ----
+function check(r){
+  const E=[], hd=TYPES[r.type].hd;
+  const add=(row,c,exp,act,why)=>{const col=hd[c]; if(!row) return; const tail=typeof exp==='number'&&typeof act==='number'&&Math.abs(exp-act)<=(/%/.test(col)?0.01:/前年度/.test(col)?2:0);
+    E.push({row,c,col,exp,act,why,tail}); (row.err||(row.err={}))[c]=tail?'tail':'bad';};
+  const val=(row,c)=>row?num(row.v[c]):0, raw=(row,c)=>row?(row.v[c]??'-'):'-';
+  const sum=(m,ks,c)=>ks.reduce((s,k)=>s+val(m[k],c),0);
+  const eq=(m,k,c,exp,why)=>{const a=val(m[k],c); if(m[k]&&a!==exp) add(m[k],c,exp,a,why);};
+  // 百分比：基數為 0 時金額 0 得 '-'/0.00，金額非 0 應為 '-'；計算為 0.00 時可為 '-'
+  const pctChk=(row,c,amt,base,bn)=>{ if(!row) return; const a=raw(row,c);
+    if(base===0){ if(amt!==0&&a!=='-') add(row,c,'-',a,`${bn}為0，百分比應為「-」`); else if(amt===0&&a!=='-'&&num(a)!==0) add(row,c,'-',num(a),`${bn}為0`); return; }
+    const e=pct(amt,base); if(a==='-'){ if(e!==0) add(row,c,e,'-',`占${bn}百分比`);} else if(num(a)!==e) add(row,c,e,num(a),`占${bn}百分比`); };
+  // 比較增減：異號應為 '-'；上年 0 則 % 為 '-'；% 比較絕對值
+  const cmpChk=(row,ct,cl,ca,cp,oppRule)=>{ const t=val(row,ct),l=val(row,cl),a=raw(row,ca),p=raw(row,cp),opp=t*l<0&&oppRule;
+    if(opp){ if(a!=='-') add(row,ca,'-',num(a),'本年與上年異號，應為「-」'); if(p!=='-') add(row,cp,'-',num(p),'本年與上年異號，應為「-」'); return; }
+    const d=t-l; if(a==='-'?d!==0:num(a)!==d) add(row,ca,d,a==='-'?'-':num(a),'本年度－上年度');
+    const n=a==='-'?0:num(a);
+    if(l===0||n===0){ if(l===0&&n!==0){ if(p!=='-') add(row,cp,'-',num(p),'上年度為0，應為「-」'); } else if(p!=='-'&&num(p)!==0) add(row,cp,'-',num(p),'增減為0'); return; }
+    const e=Math.abs(pct(n,l)); if(p==='-') add(row,cp,e,'-','增減金額÷上年度'); else if(Math.abs(num(p))!==e) add(row,cp,e,Math.abs(num(p)),'增減金額÷上年度（絕對值）'); };
+
+  if(r.type==='of01'){
+    const m={}; r.rows.forEach(x=>m[x.name]??=x);
+    const G={'業務收入':['勞務收入','銷貨收入','教學收入','租金及權利金收入','投融資業務收入','醫療收入','徵收及依法分配收入','保險收入','規費收入','其他業務收入'],
+      '業務成本與費用':['勞務成本','銷貨成本','教學成本','出租資產成本','投融資業務成本','醫療成本','保險成本','其他業務成本','業務費用','管理及總務費用','研究發展及訓練費用','其他業務費用'],
+      '業務外收入':['財務收入','其他業務外收入'],'業務外費用':['財務費用','其他業務外費用']};
+    for(const c of [0,2,4]){
+      for(const g in G) eq(m,g,c,sum(m,G[g],c),'細項加總');
+      eq(m,'業務賸餘(短絀)',c,val(m['業務收入'],c)-val(m['業務成本與費用'],c),'業務收入－業務成本與費用');
+      eq(m,'業務外賸餘(短絀)',c,val(m['業務外收入'],c)-val(m['業務外費用'],c),'業務外收入－業務外費用');
+      eq(m,'本期賸餘(短絀)',c,val(m['業務賸餘(短絀)'],c)+val(m['業務外賸餘(短絀)'],c),'業務賸餘＋業務外賸餘');
+      const base=val(m['業務收入'],c);
+      if(m['業務收入']){const a=raw(m['業務收入'],c+1); if(base!==0&&num(a)!==100) add(m['業務收入'],c+1,100,a==='-'?'-':num(a),'業務收入應為 100.00');}
+      r.rows.forEach(x=>{ if(x.name!=='業務收入'&&x.v.length) pctChk(x,c+1,val(x,c),base,'業務收入'); });
+    }
+    r.rows.forEach(x=>x.v.length&&cmpChk(x,0,2,6,7,true));
+  }
+  if(r.type==='of02'){
+    const S={},D={}; let sec=S; r.rows.forEach(x=>{ if(x.name==='短絀之部') sec=D; sec[x.name]??=x; });
+    const SC=['本期賸餘','前期未分配賸餘','追溯適用及追溯重編之影響數','公積轉列數','其他轉入數'], DI=['填補累積短絀','提存公積','賸餘撥充基金數','解繳公庫淨額','其他依法分配數'];
+    const DC=['本期短絀','前期待填補之短絀','追溯適用及追溯重編之影響數','其他轉入數'], CO=['撥用賸餘','撥用公積','折減基金','公庫撥款'];
+    for(const c of [0,2]){
+      eq(S,'賸餘之部',c,sum(S,SC,c),'細項加總'); eq(S,'分配之部',c,sum(S,DI,c),'細項加總');
+      eq(S,'賸餘之部',c,val(S['分配之部'],c)+val(S['未分配賸餘'],c),'分配之部＋未分配賸餘');
+      eq(D,'短絀之部',c,sum(D,DC,c),'細項加總'); eq(D,'填補之部',c,sum(D,CO,c),'細項加總');
+      eq(D,'短絀之部',c,val(D['填補之部'],c)+val(D['待填補之短絀'],c),'填補之部＋待填補之短絀');
+      for(const [M,tot,ks] of [[S,'賸餘之部',[...SC,'分配之部',...DI,'未分配賸餘']],[D,'短絀之部',[...DC,'填補之部',...CO,'待填補之短絀']]]){
+        const base=val(M[tot],c); if(M[tot]){const a=raw(M[tot],c+1); if(base!==0&&num(a)!==100) add(M[tot],c+1,100,a==='-'?'-':num(a),`${tot}應為 100.00`);}
+        ks.forEach(k=>M[k]&&pctChk(M[k],c+1,val(M[k],c),base,tot));
+      }
+    }
+    r.rows.forEach(x=>x.v.length&&cmpChk(x,0,2,4,5,/賸餘|短絀|淨值|基金餘額/.test(x.name)));
+  }
+  if(r.type==='of03'){
+    const O={},I={},F={},A={}; let sec=O;
+    r.rows.forEach(x=>{ if(/^投資活動之現金流量/.test(x.name)) sec=I; else if(/^籌資活動之現金流量/.test(x.name)) sec=F; else if(/^匯率影響數|^現金及約當現金之淨增/.test(x.name)) sec=A; sec[x.name]??=x; x.sec=sec; });
+    const g=(M,re)=>Object.values(M).find(x=>re.test(x.name)), v=x=>val(x,0);
+    const s1=g(O,/^未計利息股利之本期賸餘/), s0=g(O,/^本期賸餘|^本期淨利|^本期稅前/), s2=g(O,/^未計利息股利之現金流入/);
+    const chk=(x,e,why)=>{ if(x&&v(x)!==e) add(x,0,e,v(x),why); };
+    chk(s1,v(s0)+v(g(O,/^利息股利之調整/)),'本期賸餘＋利息股利之調整');
+    chk(s2,v(s1)+v(g(O,/^調整項目/)),'未計利息股利之本期賸餘＋調整項目');
+    const on=g(O,/^業務活動之淨現金/); chk(on,v(s2)+v(O['收取利息'])+v(O['收取股利'])+v(O['支付利息']),'未計利息股利之現金流入＋收取利息、股利＋支付利息');
+    const net=(M,re,why)=>{const t=g(M,re); chk(t,Object.values(M).filter(x=>x!==t&&x.v.length).reduce((s,x)=>s+v(x),0),why); return t;};
+    const inv=net(I,/之淨現金/,'投資活動各項加總'), fin=net(F,/之淨現金/,'籌資活動各項加總');
+    const nc=g(A,/^現金及約當現金之淨增/); chk(nc,v(on)+v(inv)+v(fin)+v(g(A,/^匯率影響數/)),'業務＋投資＋籌資＋匯率影響數');
+    chk(g(A,/^期末現金/),v(g(A,/^期初現金/))+v(nc),'期初現金＋淨增（淨減）');
+  }
+  return E;
+}
+
+let RES=[];
+function render(){
+  const errN=RES.reduce((s,r)=>s+r.E.filter(e=>!e.tail).length,0), tailN=RES.reduce((s,r)=>s+r.E.filter(e=>e.tail).length,0);
+  let h=`<section class="card"><h2>檢誤摘要</h2><p>共 ${RES.length} 張報表；錯誤 <span class="ng">${errN}</span>、尾差 ${tailN}。</p><div class="wrap"><table><tr><th>基金</th><th>報表</th><th>結果</th></tr>`;
+  RES.forEach(r=>{const e=r.E.filter(x=>!x.tail).length,t=r.E.length-e; h+=`<tr><td>${esc(r.fund)}</td><td>${TYPES[r.type].t}</td><td>${!r.rows.length?'<span class="ng">未解析到資料</span>':e?`<span class="ng">錯誤 ${e}</span>`:'<span class="ok">通過</span>'}${t?`（尾差 ${t}）`:''}</td></tr>`;});
+  h+='</table></div></section>';
+  RES.forEach(r=>{const T=TYPES[r.type];
+    h+=`<section class="card"><h2>${esc(r.fund)}　${T.t}</h2>`;
+    if(r.E.length){h+='<div class="wrap"><table><tr><th>項目</th><th>欄位</th><th>應為</th><th>實為</th><th>類別</th><th>驗算</th></tr>';
+      r.E.forEach(e=>h+=`<tr><td>${esc(e.row.name)}</td><td>${e.col}</td><td class="num">${fmt(e.exp)}</td><td class="num">${fmt(e.act)}</td><td class="${e.tail?'':'ng'}">${e.tail?'尾差':'錯誤'}</td><td>${esc(e.why)}</td></tr>`);
+      h+='</table></div>';} else h+='<p class="ok">全部驗算相符。</p>';
+    h+=`<details><summary>解析結果（${r.rows.length} 列）</summary><div class="wrap"><table><tr><th>${r.type==='of01'?'科目':'項目'}</th>${T.hd.map(x=>`<th>${x}</th>`).join('')}</tr>`;
+    r.rows.forEach(x=>h+=`<tr><td>${esc(x.name)}</td>${T.hd.map((_,c)=>`<td class="num ${x.err?.[c]||''}">${esc(x.v[c]??'')}</td>`).join('')}</tr>`);
+    h+='</table></div></details></section>';});
+  $('out').innerHTML=h;
+}
+function exportXlsx(){
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['基金','報表','項目','欄位','應為','實為','類別','驗算'],...RES.flatMap(r=>r.E.map(e=>[r.fund,TYPES[r.type].t,e.row.name,e.col,e.exp,e.act,e.tail?'尾差':'錯誤',e.why]))]),'檢誤結果');
+  for(const k in TYPES){const rs=RES.filter(r=>r.type===k); if(!rs.length) continue;
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['基金',k==='of01'?'科目':'項目',...TYPES[k].hd],...rs.flatMap(r=>r.rows.map(x=>[r.fund,x.name,...TYPES[k].hd.map((_,c)=>x.v[c]==null?'':x.v[c]==='-'?'-':num(x.v[c]))]))]),TYPES[k].t);}
+  XLSX.writeFile(wb,'報表數字檢誤.xlsx');
+}
+const inp=$('fa'), lab=inp.closest('label'), ready=()=>$('go').disabled=!inp.files.length;
+inp.onchange=ready;
+lab.ondragover=e=>{e.preventDefault();lab.classList.add('over');}; lab.ondragleave=()=>lab.classList.remove('over');
+lab.ondrop=e=>{e.preventDefault();lab.classList.remove('over');if(e.dataTransfer.files.length){inp.files=e.dataTransfer.files;ready();}};
+addEventListener('dragover',e=>e.preventDefault());addEventListener('drop',e=>e.preventDefault());
+$('go').onclick=async()=>{
+  $('msg').textContent='解析中…'; RES=[];
+  try{ for(const f of inp.files){ const rs=await parse(await f.arrayBuffer()); if(!rs.length) $('msg').textContent+=` ${f.name} 未找到可辨識的報表；`; rs.forEach(r=>{r.E=check(r);RES.push(r);}); }
+    render(); $('xl').hidden=!RES.length; $('xl').onclick=exportXlsx; $('msg').textContent=$('msg').textContent.replace('解析中…','');
+  }catch(e){ $('msg').textContent='解析失敗：'+e.message; console.error(e); }
+};
+</script></body></html>
