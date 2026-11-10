@@ -17,7 +17,7 @@ nav.tabs{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0}nav.tabs button{borde
 <section class="card in"><h2>上傳 PDF</h2>
 <label class="f">報表 PDF（可多選，一個檔案可含多張報表）<small>拖曳檔案到這裡，或點選選擇</small><input type="file" id="fa" accept=".pdf" multiple></label>
 <button id="go" disabled>開始檢誤</button> <button id="xl" hidden>匯出 Excel</button> <span id="msg" class="small"></span>
-<p class="small">檔案只在瀏覽器內解析，不會上傳。依頁首標題自動判斷報表種類，適用作業基金、特別收入基金及國立大學校院校務基金（項目表＋基金別各校表，另核基金別合計＝項目表），支援單位表及綜計表（依科目分列、依業務別／主管別／基金別分列的對開頁），多欄綜計表另核「合計＝各欄加總」（作業基金收支餘絀表、餘絀撥補表、現金流量表；普通基金基金來源、用途及餘絀表、現金流量表）。只上傳單位表時，依業別／主管對照自動彙編綜計表（依科目、業務別、主管別、基金別，格式同 PDF，可匯出 Excel）；單位表與綜計表一起上傳時另核散總：綜計表各科目＝各單位表同科目加總，作業基金業務別、主管別綜計表各欄＝所屬基金單位表加總，特別收入基金綜計表各基金列、主管別現金流量表各基金欄＝該基金單位表。尾差容忍：前年度決算金額差 2 以內、百分比差 0.01 以內標黃色「尾差」，其餘差異標紅色「錯誤」。</p></section>
+<p class="small">檔案只在瀏覽器內解析，不會上傳。依頁首標題自動判斷報表種類，適用作業基金、特別收入基金及國立大學校院校務基金（項目表＋基金別各校表，另核基金別合計＝項目表），支援單位表及綜計表（依科目分列、依業務別／主管別／基金別分列的對開頁），多欄綜計表另核「合計＝各欄加總」（作業基金收支餘絀表、餘絀撥補表、現金流量表；普通基金基金來源、用途及餘絀表、現金流量表）。另支援參考表「固定資產建設改良擴充與資金來源綜計表」（各資產欄＝合計＝資金來源合計）及「基金數額增減綜計表」（期初＋增加數－減少數＝期末），並核主管＝所屬基金、基金＝所屬計畫、計畫＝細項、合計＝各主管加總。只上傳單位表時，依業別／主管對照自動彙編綜計表（依科目、業務別、主管別、基金別，格式同 PDF，可匯出 Excel）；單位表與綜計表一起上傳時另核散總：綜計表各科目＝各單位表同科目加總，作業基金業務別、主管別綜計表各欄＝所屬基金單位表加總，特別收入基金綜計表各基金列、主管別現金流量表各基金欄＝該基金單位表。尾差容忍：前年度決算金額差 2 以內、百分比差 0.01 以內標黃色「尾差」，其餘差異標紅色「錯誤」。</p></section>
 <div id="out"></div></main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -35,6 +35,9 @@ const TYPES={of01:{t:'收支餘絀表',hd:['本年度預算 金額','本年度�
   of02:{t:'餘絀撥補表',hd:['本年度預算 金額','本年度預算 %','上年度預算 金額','上年度預算 %','比較增減 金額','比較增減 %'],start:/^(賸餘|短絀)之部/,end:/^待填補之短絀$/},
   gf01:{t:'基金來源、用途及餘絀表',hd:['本年度預算 金額','本年度預算 %','上年度預算 金額','上年度預算 %','前年度決算 金額','前年度決算 %','比較增減 金額','比較增減 %'],start:/^基金來源/,end:/^期末基金餘額/},
   of03:{t:'現金流量表',hd:['金額'],start:/^(業務|營業)活動之現金流量/,end:/^期末現金及約當現金/}};
+/* 參考表：列為主管／基金／計畫，表內欄位運算＋列運算 */
+TYPES.fa={t:'固定資產建設改良擴充與資金來源綜計表',ref:1,hd:['合計','不動產、廠房及設備 土地','不動產、廠房及設備 土地改良物','不動產、廠房及設備 房屋及建築','不動產、廠房及設備 機械及設備','不動產、廠房及設備 交通及運輸設備','不動產、廠房及設備 什項設備','不動產、廠房及設備 租賃權益改良','不動產、廠房及設備 生產性植物','不動產、廠房及設備 其他','投資性不動產','資金來源 合計','資金來源 營運資金','資金來源 國庫撥款','資金來源 外借資金','資金來源 其他']};
+TYPES.fd={t:'基金數額增減綜計表',ref:1,hd:['期初基金數額','增加數 以前年度公積撥充','增加數 賸餘撥充','增加數 以國有財產撥充','增加數 國庫增撥數','增加數 其他','減少數','期末基金數額']};
 const SKIP=/中華民國|單位:|^科目|^項目|^金額|本年度|上年度|前年度|比較增減|備註$/;
 TYPES.sf01={t:'基金來源、用途及餘絀表',hd:['本年度預算數 基金來源','本年度預算數 基金用途','本年度預算數 賸餘(短絀)','上年度預算數 基金來源','上年度預算數 基金用途','上年度預算數 賸餘(短絀)','本年度與上年度比較 基金來源','本年度與上年度比較 基金用途','本年度與上年度比較 賸餘(短絀)','期初基金餘額','解繳公庫','期末基金餘額'],start:/主管$|^合計|^總計/,end:/^$/};
 
@@ -57,9 +60,11 @@ async function parse(buf){
   for(let p=1;p<=doc.numPages;p++){
     let {W,t}=await tokens(doc,p,0), lines=toLines(t);
     const hd3=ls=>ls.slice(0,3).map(l=>l.its.map(i=>i.t).join('')).join('').replace(/\s/g,'').replace('綜計表','表');
-    const find=h=>Object.keys(TYPES).find(k=>k!=='sf01'&&h.includes(TYPES[k].t));
+    const find=h=>Object.keys(TYPES).find(k=>k!=='sf01'&&!TYPES[k].ref&&h.includes(TYPES[k].t));
     let head=hd3(lines);
     if(!find(head)&&p<doc.numPages){ t=t.concat((await tokens(doc,p+1,W)).t); p++; lines=toLines(t); head=hd3(lines); }   /* 對開頁：標題被切半，右頁接在左頁右邊 */
+    const lt=/資金來源表/.test(head)?'fa':/基金數額增減表/.test(head)?'fd':null;
+    if(lt){ parseRef(lines,lt,reps,head); continue; }
     let type=find(head); if(!type) continue;
     const st=lines.findIndex(l=>TYPES[type].start.test(l.its.filter(i=>!isVal(i.t)).map(i=>i.t).join('').replace(/\s/g,'')));
     const top=lines.slice(0,st<0?8:st).map(l=>l.its.map(i=>i.t).join('')).join('').replace(/\s/g,''), base=head.split(TYPES[type].t)[0];
@@ -102,6 +107,48 @@ function splitGroups(r,first){
   r.hd=r.names.flatMap(n=>w===2?[n+' 金額',n+' %']:[n]); r.w=w; return r;
 }
 
+function parseRef(lines,type,reps,head){
+  const fund=(head.match(/(\d+)年度/)||lines.map(l=>l.its.map(i=>i.t).join('')).join('').match(/(\d+)年度/)||[,''])[1]+'年度', key=fund+'|'+type;
+  const rep=reps[key]||(reps[key]={fund,type,rows:[],ref:1}), L=TYPES[type].hd.length;
+  const txt=l=>l.its.map(i=>i.t).join('').replace(/\s/g,'');
+  let st=-1; lines.slice(0,14).forEach((l,i)=>{ if(!l.its.some(x=>isVal(x.t))&&/資金$|公積撥充/.test(txt(l))) st=i; });   /* 表頭最後一列 */
+  const MK=/^([（(][一二三四五六七八九十]+[）)]|[一二三四五六七八九十]+、|\d+[.、])|主管$|基金(\(.*?\)|（.*?）)?$|^(合計|總計)$/;
+  let pend='';
+  for(const {its:l} of lines.slice(st+1)){
+    const k=l.findIndex(i=>isVal(i.t)), name=(k<0?l:l.slice(0,k)).map(i=>i.t).join('').replace(/\s/g,''), v=k<0?[]:l.slice(k).filter(i=>isVal(i.t)).map(i=>i.t);
+    if(!name&&!v.length||/中華民國|單位:/.test(name)) continue; if(/^註/.test(name)) break;
+    if(!v.length){ const prev=rep.rows[rep.rows.length-1]; if(!pend&&prev&&!isF(prev.name)&&!/主管$/.test(prev.name)&&isF(prev.name+name)||!(pend||MK.test(name)||!prev)) prev.name+=name; else pend+=name; continue; }   /* 計畫名稱換行：數字可能在中間列 */
+    for(let i=v.length-1;v.length>L&&i>=0;i--) if(/^\d$/.test(v[i])) v.splice(i,1);   /* 114 年度跨頁處殘留單一數字 */
+    if(v.length!==L) continue;
+    const prev=rep.rows[rep.rows.length-1], m=!pend&&prev&&!isF(prev.name)&&!/主管$/.test(prev.name)&&name.match(/^(.*?基金(?:\(.*?\)|（.*?）)?)((?:[一二三四五六七八九十]+、|[（(][一二三四五六七八九十]+[）)]).*)$/);
+    if(m&&isF(prev.name+m[1])){ prev.name+=m[1]; rep.rows.push({name:m[2],v}); continue; }   /* 基金名稱換行與下一列擠在同一行 */
+    rep.rows.push({name:pend+name,v}); pend='';
+  }
+  rep.rows.forEach(x=>x.name=x.name.replace(/[\u0000-\u001f]/g,'').replace(/(基金(?:\(.*?\))?)[基金計]$/,'$1'));   /* 114 年度粗體重疊殘字（…基金基、…(綜計)計） */
+}
+/* 列層級：-1 合計、0 主管、1 基金、2 一、或未編號計畫、3 （一）或「一、」下未編號細項、4 1.
+   ponytail: 114 年度粗體字型無法解碼，主管列以「下一列是基金」判斷；最後一列無法辨識者視為合計 */
+const isF=n=>/基金(\(.*?\)|（.*?）)?$/.test(n);
+function levels(R){ let num2=false;
+  return R.map((x,i)=>{ const n=x.name;
+    if(/^(合計|總計)$/.test(n)) return -1; if(/主管$/.test(n)) return 0;
+    if(/^[一二三四五六七八九十]+、/.test(n)){num2=true; return 2;} if(/^[（(][一二三四五六七八九十]+[）)]/.test(n)) return 3; if(/^\d+[.、]/.test(n)) return 4;
+    if(isF(n)){num2=false; return 1;}
+    if(/[\u3400-\u4DBF\u1C00-\u1FFF\u2500-\u25FF]/.test(n)&&R[i+1]&&isF(R[i+1].name)) return 0;   /* 無法解碼的主管名稱 */ if(i===R.length-1&&R.length>2) return -1;
+    return num2?3:2; }); }
+function checkRef(r){
+  const E=[], hd=TYPES[r.type].hd, add=(x,c,e,why)=>{ const a=num(x.v[c]); if(Math.abs(a-e)>1e-9){E.push({row:x,c,col:hd[c].replace(' ',''),exp:e,act:a,why,tail:false}); (x.err||(x.err={}))[c]='bad';} };
+  const R=r.rows, n=(x,c)=>num(x.v[c]), sm=(x,a,b)=>{let t=0; for(let c=a;c<=b;c++) t+=n(x,c); return t;};
+  R.forEach(x=>{ if(r.type==='fa'){ add(x,0,sm(x,1,10),'各資產欄加總'); add(x,11,sm(x,12,15),'各資金來源加總'); add(x,11,n(x,0),'資金來源合計＝資產合計'); }
+    else add(x,7,n(x,0)+sm(x,1,5)-n(x,6),'期初＋增加數－減少數'); });
+  const lv=levels(R);
+  R.forEach((x,i)=>{ const L=lv[i]; if(L<0) return; const ch=[]; for(let j=i+1;j<R.length&&lv[j]>L;j++) ch.push(j); if(!ch.length) return;
+    const m=Math.min(...ch.map(j=>lv[j])), d=ch.filter(j=>lv[j]===m).map(j=>R[j]);
+    hd.forEach((_,c)=>add(x,c,d.reduce((a,y)=>a+n(y,c),0),['','所屬基金加總','所屬計畫加總','所屬細項加總','所屬細項加總'][L+1]||'下層加總')); });
+  const tot=R.find((x,i)=>lv[i]<0), ms=R.filter((x,i)=>lv[i]===0);
+  if(tot&&ms.length) hd.forEach((_,c)=>add(tot,c,ms.reduce((a,y)=>a+n(y,c),0),'各主管加總'));
+  return E;
+}
 // ---- 驗算 ----
 function checkMulti(r){
   const L=TYPES[r.type].hd.length, w=r.w, E=[];
@@ -127,7 +174,7 @@ function checkSf(r){
   return E;
 }
 function check(r){
-  if(r.w) return checkMulti(r); if(r.type==='sf01') return checkSf(r);
+  if(r.w) return checkMulti(r); if(r.type==='sf01') return checkSf(r); if(TYPES[r.type].ref) return checkRef(r);
   const E=[], hd=TYPES[r.type].hd;
   const add=(row,c,exp,act,why)=>{const col=hd[c]; if(!row) return; const tail=typeof exp==='number'&&typeof act==='number'&&Math.abs(exp-act)<=(/%/.test(col)?0.01:/前年度/.test(col)?2:0)+1e-9;
     E.push({row,c,col,exp,act,why,tail}); (row.err||(row.err={}))[c]=tail?'tail':'bad';};
@@ -334,7 +381,7 @@ function buildTot(rs){
 let RES=[];
 function render(){
   /* 摘要後先綜計表（含基金別多欄表、散總），再各基金 */
-  const rk=r=>/^散總/.test(r.fund)?2:r.gen||/^(作業基金|特別收入基金)(（|$)/.test(r.fund)?0:r.multi?1:3; /* 各基金依基金編號（作業基金 1–30，再特別收入基金依 SF-01 序），同基金依報表種類 */
+  const rk=r=>/^散總/.test(r.fund)?2:r.ref||r.gen||/^(作業基金|特別收入基金)(（|$)/.test(r.fund)?0:r.multi?1:3; /* 各基金依基金編號（作業基金 1–30，再特別收入基金依 SF-01 序），同基金依報表種類 */
   const FO=[...Object.keys(OFMAP),...SFF.map(a=>a[1])], fo=r=>{const i=FO.indexOf(r.fund); return i<0?999:i;}, to=r=>['of01','gf01','of02','of03','sf01'].indexOf(r.type);
   RES=RES.map((r,i)=>[r,i]).sort((a,b)=>rk(a[0])-rk(b[0])||(rk(a[0])===3?fo(a[0])-fo(b[0])||to(a[0])-to(b[0]):0)||a[1]-b[1]).map(a=>a[0]);
   const errN=RES.reduce((s,r)=>s+r.E.filter(e=>!e.tail).length,0), tailN=RES.reduce((s,r)=>s+r.E.filter(e=>e.tail).length,0);
@@ -351,7 +398,7 @@ function render(){
       r.E.forEach(e=>h+=`<tr><td>${esc(e.row.name)}</td><td>${e.col}</td><td class="num">${fmt(e.exp)}</td><td class="num">${fmt(e.act)}</td><td class="${e.tail?'':'ng'}">${e.tail?'尾差':'錯誤'}</td><td>${esc(e.why)}</td></tr>`);
       h+='</table></div>';} else h+='<p class="ok">全部驗算相符。</p>';
     const hd=r.hd||T.hd, cs=hd.map((_,c)=>c).filter(c=>r.hd||r.rows.some(x=>x.v[c]!=null&&x.v[c]!==''));   /* 綜計表（依科目分列）無前年度欄：不顯示 */
-    h+=`<details><summary>解析結果（${r.rows.length} 列）</summary><div class="wrap"><table>${hdHtml(cs.map(c=>hd[c]),r.type==='of01'?'科目':r.type==='sf01'?'基金別':'項目')}`;
+    h+=`<details><summary>解析結果（${r.rows.length} 列）</summary><div class="wrap"><table>${hdHtml(cs.map(c=>hd[c]),r.type==='of01'?'科目':r.type==='sf01'?'基金別':r.type==='fa'?'基金及計畫名稱':r.type==='fd'?'基金名稱':'項目')}`;
     r.rows.forEach(x=>h+=`<tr><td>${esc(x.name)}</td>${cs.map(c=>`<td class="num ${x.err?.[c]||''}">${esc(x.v[c]??'')}</td>`).join('')}</tr>`);
     h+='</table></div></details></section>';});
   if(cur>=0) h+='</div>';
