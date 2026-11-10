@@ -6,7 +6,7 @@ main{padding:20px 16px 50px}.card{background:#fff;border:1px solid #e2e8ed;borde
 .card h2{color:var(--n);margin:0 0 12px;font-size:1.2rem}.card h3{color:var(--n);margin:16px 0 8px}
 label.f{display:block;border:2px dashed #9fb1c0;border-radius:10px;padding:14px;cursor:pointer}label.f input{display:block;margin-top:6px;max-width:100%}label.f.over{border-color:var(--b);background:#eaf3f8}label.f small{display:block;color:#667784}
 button{border:0;background:var(--n);color:#fff;padding:9px 16px;border-radius:8px;cursor:pointer;font-weight:700;margin-top:12px}button:disabled{opacity:.5}
-table{width:100%;border-collapse:collapse;font-size:.88rem}th{background:var(--n);color:#fff;text-align:center;padding:6px}td{padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+table{width:100%;border-collapse:collapse;font-size:.88rem}th{background:var(--n);color:#fff;text-align:center;padding:6px;border:1px solid rgba(255,255,255,.25)}td{padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top}details td:first-child{white-space:nowrap}
 td.num{text-align:right;white-space:nowrap}td.bad{background:var(--bad)}td.tail{background:var(--tail)}.small{color:#667784;font-size:.86rem}.wrap{overflow-x:auto}
 .ok{color:#2e7d32;font-weight:700}.ng{color:#c62828;font-weight:700}details{margin-top:8px}summary{cursor:pointer;color:var(--b)}
 @media print{header,.card.in{display:none}}
@@ -30,12 +30,12 @@ const fmt=n=>typeof n==='number'?n.toLocaleString('en-US',{maximumFractionDigits
 // 四捨五入到 0.01（整數運算避免浮點誤差）
 const pct=(a,b)=>{const A=BigInt(Math.round(a)),B=BigInt(Math.round(b)),s=(A<0n)!==(B<0n)?-1:1,aa=A<0n?-A:A,bb=B<0n?-B:B;return s*Number((2n*aa*10000n+bb)/(2n*bb))/100;};
 
-const TYPES={of01:{t:'收支餘絀表',hd:['本年度預算金額','本年度預算%','上年度預算金額','上年度預算%','前年度決算金額','前年度決算%','比較增減金額','比較增減%'],start:/^業務收入/,end:/^本期賸餘\(短絀\)/},
-  of02:{t:'餘絀撥補表',hd:['本年度預算金額','本年度預算%','上年度預算金額','上年度預算%','比較增減金額','比較增減%'],start:/^(賸餘|短絀)之部/,end:/^待填補之短絀$/},
-  gf01:{t:'基金來源、用途及餘絀表',hd:['本年度預算金額','本年度預算%','上年度預算金額','上年度預算%','前年度決算金額','前年度決算%','比較增減金額','比較增減%'],start:/^基金來源/,end:/^期末基金餘額/},
+const TYPES={of01:{t:'收支餘絀表',hd:['本年度預算 金額','本年度預算 %','上年度預算 金額','上年度預算 %','前年度決算 金額','前年度決算 %','比較增減 金額','比較增減 %'],start:/^業務收入/,end:/^本期賸餘\(短絀\)/},
+  of02:{t:'餘絀撥補表',hd:['本年度預算 金額','本年度預算 %','上年度預算 金額','上年度預算 %','比較增減 金額','比較增減 %'],start:/^(賸餘|短絀)之部/,end:/^待填補之短絀$/},
+  gf01:{t:'基金來源、用途及餘絀表',hd:['本年度預算 金額','本年度預算 %','上年度預算 金額','上年度預算 %','前年度決算 金額','前年度決算 %','比較增減 金額','比較增減 %'],start:/^基金來源/,end:/^期末基金餘額/},
   of03:{t:'現金流量表',hd:['金額'],start:/^(業務|營業)活動之現金流量/,end:/^期末現金及約當現金/}};
 const SKIP=/中華民國|單位:|^科目|^項目|^金額|本年度|上年度|前年度|比較增減|備註$/;
-TYPES.sf01={t:'基金來源、用途及餘絀表',hd:['本年度基金來源','本年度基金用途','本年度賸餘(短絀)','上年度基金來源','上年度基金用途','上年度賸餘(短絀)','比較基金來源','比較基金用途','比較賸餘(短絀)','期初基金餘額','解繳公庫','期末基金餘額'],start:/主管$|^合計|^總計/,end:/^$/};
+TYPES.sf01={t:'基金來源、用途及餘絀表',hd:['本年度預算數 基金來源','本年度預算數 基金用途','本年度預算數 賸餘(短絀)','上年度預算數 基金來源','上年度預算數 基金用途','上年度預算數 賸餘(短絀)','本年度與上年度比較 基金來源','本年度與上年度比較 基金用途','本年度與上年度比較 賸餘(短絀)','期初基金餘額','解繳公庫','期末基金餘額'],start:/主管$|^合計|^總計/,end:/^$/};
 
 async function tokens(doc,p,dx){
   const pg=await doc.getPage(p), vp=pg.getViewport({scale:1}), H=vp.height;
@@ -240,6 +240,9 @@ function checkSum(rs){
   /* 作業基金業務別／主管別綜計表：各欄＝所屬基金單位表本年度加總（欄序＝業別／主管編號） */
   /* 特別收入基金主管別現金流量表：每基金一欄，欄序同 SF-01 基金列 */
   const sfF=sf?sf.rows.map(x=>x.name).filter(n=>!/主管$|^(合計|總計)/.test(n)):[];
+  /* 主管別現金流量表欄名照 PDF 兩層：主管／基金（取自 SF-01 列序） */
+  if(sf){ let m=''; const own={}; sf.rows.forEach(x=>/主管$/.test(x.name)?m=x.name:own[x.name]=m);
+    rs.filter(r=>r.multi&&/^特別收入基金/.test(r.fund)&&r.type==='of03'&&sfF.length===r.names.length-1).forEach(r=>{r.names=['合計',...sfF]; r.hd=['合計',...sfF.map(f=>own[f]+' '+f)];}); }
   rs.filter(r=>r.multi&&(/^作業基金（(業務|主管)/.test(r.fund)||/^特別收入基金/.test(r.fund)&&sfF.length===r.names.length-1)).forEach(T=>{
     const col=/^特別/.test(T.fund)?f=>sfF.indexOf(f)+1||null:f=>OFMAP[f]?.[/業務/.test(T.fund)?0:1], w=T.w, grp=units.filter(r=>r.type===T.type&&col(r.fund)), sum={};
     grp.forEach(r=>{const g=col(r.fund); keyed(r.rows).forEach(([k,x])=>{(sum[k]||(sum[k]=[]))[g]=(sum[k][g]||0)+num(x.v[0]);});});
@@ -256,6 +259,15 @@ function checkSum(rs){
     out.push(R); }
   return out;
 }
+/* 兩層表頭：「群組 子欄」以空白分隔，相鄰同群組合併；無子欄者跨兩列 */
+function hdHtml(hd,first){
+  const p=hd.map(x=>{const i=x.lastIndexOf(' '); return i<0?[x]:[x.slice(0,i),x.slice(i+1)];});
+  if(!p.some(a=>a.length>1)) return `<tr><th>${first}</th>${hd.map(x=>`<th>${esc(x)}</th>`).join('')}</tr>`;
+  let a=`<tr><th rowspan="2">${first}</th>`, b='<tr>';
+  for(let i=0;i<p.length;){ if(p[i].length<2){a+=`<th rowspan="2">${esc(p[i][0])}</th>`;i++;continue;}
+    let j=i; while(j<p.length&&p[j].length>1&&p[j][0]===p[i][0]) b+=`<th>${esc(p[j++][1])}</th>`; a+=`<th colspan="${j-i}">${esc(p[i][0])}</th>`; i=j; }
+  return a+'</tr>'+b+'</tr>';
+}
 let RES=[];
 function render(){
   const errN=RES.reduce((s,r)=>s+r.E.filter(e=>!e.tail).length,0), tailN=RES.reduce((s,r)=>s+r.E.filter(e=>e.tail).length,0);
@@ -267,8 +279,9 @@ function render(){
     if(r.E.length){h+='<div class="wrap"><table><tr><th>項目</th><th>欄位</th><th>應為</th><th>實為</th><th>類別</th><th>驗算</th></tr>';
       r.E.forEach(e=>h+=`<tr><td>${esc(e.row.name)}</td><td>${e.col}</td><td class="num">${fmt(e.exp)}</td><td class="num">${fmt(e.act)}</td><td class="${e.tail?'':'ng'}">${e.tail?'尾差':'錯誤'}</td><td>${esc(e.why)}</td></tr>`);
       h+='</table></div>';} else h+='<p class="ok">全部驗算相符。</p>';
-    h+=`<details><summary>解析結果（${r.rows.length} 列）</summary><div class="wrap"><table><tr><th>${r.type==='of01'?'科目':'項目'}</th>${(r.hd||T.hd).map(x=>`<th>${esc(x)}</th>`).join('')}</tr>`;
-    r.rows.forEach(x=>h+=`<tr><td>${esc(x.name)}</td>${(r.hd||T.hd).map((_,c)=>`<td class="num ${x.err?.[c]||''}">${esc(x.v[c]??'')}</td>`).join('')}</tr>`);
+    const hd=r.hd||T.hd, cs=hd.map((_,c)=>c).filter(c=>r.hd||r.rows.some(x=>x.v[c]!=null&&x.v[c]!==''));   /* 綜計表（依科目分列）無前年度欄：不顯示 */
+    h+=`<details><summary>解析結果（${r.rows.length} 列）</summary><div class="wrap"><table>${hdHtml(cs.map(c=>hd[c]),r.type==='of01'?'科目':r.type==='sf01'?'基金別':'項目')}`;
+    r.rows.forEach(x=>h+=`<tr><td>${esc(x.name)}</td>${cs.map(c=>`<td class="num ${x.err?.[c]||''}">${esc(x.v[c]??'')}</td>`).join('')}</tr>`);
     h+='</table></div></details></section>';});
   $('out').innerHTML=h;
 }
