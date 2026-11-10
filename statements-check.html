@@ -16,7 +16,7 @@ td.num{text-align:right;white-space:nowrap}td.bad{background:var(--bad)}td.tail{
 <section class="card in"><h2>上傳 PDF</h2>
 <label class="f">報表 PDF（可多選，一個檔案可含多張報表）<small>拖曳檔案到這裡，或點選選擇</small><input type="file" id="fa" accept=".pdf" multiple></label>
 <button id="go" disabled>開始檢誤</button> <button id="xl" hidden>匯出 Excel</button> <span id="msg" class="small"></span>
-<p class="small">檔案只在瀏覽器內解析，不會上傳。依頁首標題自動判斷報表種類，支援單位表及綜計表（依科目分列、依業務別／主管別／基金別分列的對開頁），多欄綜計表另核「合計＝各欄加總」（作業基金收支餘絀表、餘絀撥補表、現金流量表；普通基金基金來源、用途及餘絀表、現金流量表）。只上傳單位表時，依業別／主管對照自動彙編綜計表（依科目、業務別、主管別、基金別，格式同 PDF，可匯出 Excel）；單位表與綜計表一起上傳時另核散總：綜計表各科目＝各單位表同科目加總，作業基金業務別、主管別綜計表各欄＝所屬基金單位表加總，特別收入基金綜計表各基金列、主管別現金流量表各基金欄＝該基金單位表。尾差容忍：前年度決算金額差 2 以內、百分比差 0.01 以內標黃色「尾差」，其餘差異標紅色「錯誤」。</p></section>
+<p class="small">檔案只在瀏覽器內解析，不會上傳。依頁首標題自動判斷報表種類，適用作業基金、特別收入基金及國立大學校院校務基金（項目表＋基金別各校表，另核基金別合計＝項目表），支援單位表及綜計表（依科目分列、依業務別／主管別／基金別分列的對開頁），多欄綜計表另核「合計＝各欄加總」（作業基金收支餘絀表、餘絀撥補表、現金流量表；普通基金基金來源、用途及餘絀表、現金流量表）。只上傳單位表時，依業別／主管對照自動彙編綜計表（依科目、業務別、主管別、基金別，格式同 PDF，可匯出 Excel）；單位表與綜計表一起上傳時另核散總：綜計表各科目＝各單位表同科目加總，作業基金業務別、主管別綜計表各欄＝所屬基金單位表加總，特別收入基金綜計表各基金列、主管別現金流量表各基金欄＝該基金單位表。尾差容忍：前年度決算金額差 2 以內、百分比差 0.01 以內標黃色「尾差」，其餘差異標紅色「錯誤」。</p></section>
 <div id="out"></div></main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -332,6 +332,8 @@ function buildTot(rs){
 }
 let RES=[];
 function render(){
+  /* 摘要後先綜計表（含基金別多欄表、散總），再各基金 */
+  const rk=r=>/^散總/.test(r.fund)?2:r.gen||/^(作業基金|特別收入基金)(（|$)/.test(r.fund)?0:r.multi?1:3; RES=RES.map((r,i)=>[r,i]).sort((a,b)=>rk(a[0])-rk(b[0])||a[1]-b[1]).map(a=>a[0]);
   const errN=RES.reduce((s,r)=>s+r.E.filter(e=>!e.tail).length,0), tailN=RES.reduce((s,r)=>s+r.E.filter(e=>e.tail).length,0);
   let h=`<section class="card"><h2>檢誤摘要</h2><p>共 ${RES.length} 張報表；錯誤 <span class="ng">${errN}</span>、尾差 ${tailN}。</p><div class="wrap"><table><tr><th>基金</th><th>報表</th><th>結果</th></tr>`;
   RES.forEach(r=>{const e=r.E.filter(x=>!x.tail).length,t=r.E.length-e; h+=`<tr><td>${esc(r.fund)}</td><td>${TYPES[r.type].t}</td><td>${!r.rows.length?'<span class="ng">未解析到資料</span>':e?`<span class="ng">錯誤 ${e}</span>`:'<span class="ok">通過</span>'}${t?`（尾差 ${t}）`:''}</td></tr>`;});
