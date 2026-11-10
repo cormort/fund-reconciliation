@@ -16,7 +16,7 @@ td.num{text-align:right;white-space:nowrap}td.bad{background:var(--bad)}td.tail{
 <section class="card in"><h2>上傳 PDF</h2>
 <label class="f">報表 PDF（可多選，一個檔案可含多張報表）<small>拖曳檔案到這裡，或點選選擇</small><input type="file" id="fa" accept=".pdf" multiple></label>
 <button id="go" disabled>開始檢誤</button> <button id="xl" hidden>匯出 Excel</button> <span id="msg" class="small"></span>
-<p class="small">檔案只在瀏覽器內解析，不會上傳。依頁首標題自動判斷報表種類，支援單位表及綜計表（依科目分列、依業務別／主管別／基金別分列的對開頁），多欄綜計表另核「合計＝各欄加總」（作業基金收支餘絀表、餘絀撥補表、現金流量表；普通基金基金來源、用途及餘絀表、現金流量表）。單位表與綜計表一起上傳時另核散總：綜計表各科目＝各單位表同科目加總，作業基金業務別、主管別綜計表各欄＝所屬基金單位表加總，特別收入基金綜計表各基金列、主管別現金流量表各基金欄＝該基金單位表。尾差容忍：前年度決算金額差 2 以內、百分比差 0.01 以內標黃色「尾差」，其餘差異標紅色「錯誤」。</p></section>
+<p class="small">檔案只在瀏覽器內解析，不會上傳。依頁首標題自動判斷報表種類，支援單位表及綜計表（依科目分列、依業務別／主管別／基金別分列的對開頁），多欄綜計表另核「合計＝各欄加總」（作業基金收支餘絀表、餘絀撥補表、現金流量表；普通基金基金來源、用途及餘絀表、現金流量表）。只上傳單位表時，依業別／主管對照自動彙編綜計表（依科目、業務別、主管別、基金別，格式同 PDF，可匯出 Excel）；單位表與綜計表一起上傳時另核散總：綜計表各科目＝各單位表同科目加總，作業基金業務別、主管別綜計表各欄＝所屬基金單位表加總，特別收入基金綜計表各基金列、主管別現金流量表各基金欄＝該基金單位表。尾差容忍：前年度決算金額差 2 以內、百分比差 0.01 以內標黃色「尾差」，其餘差異標紅色「錯誤」。</p></section>
 <div id="out"></div></main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -268,6 +268,63 @@ function hdHtml(hd,first){
     let j=i; while(j<p.length&&p[j].length>1&&p[j][0]===p[i][0]) b+=`<th>${esc(p[j++][1])}</th>`; a+=`<th colspan="${j-i}">${esc(p[i][0])}</th>`; i=j; }
   return a+'</tr>'+b+'</tr>';
 }
+/* ---- 由單位表彙編綜計表（未上傳綜計 PDF 時） ---- */
+const OF_BIZ=['教育文化服務','醫療服務','社會保險','公共建設及設施服務','產銷業務','投融資、開發及住宅業務','其他'];
+const OF_MGR=['行政院主管','內政部主管','國防部主管','教育部主管','法務部主管','經濟部主管','交通部主管','國軍退除役官兵輔導委員會主管','國家科學及技術委員會主管','農業部主管','勞動部主管','衛生福利部主管','文化部主管','國立故宮博物院主管','原住民族委員會主管','考試院考選部主管'];
+/* 特別收入基金：主管 → 所屬基金（SF-01 列序） */
+const SFMAP=[['總統府主管',['中央研究院科學研究基金']],['行政院主管',['行政院國家科學技術發展基金','離島建設基金','花東地區永續發展基金','促進轉型正義基金']],
+  ['內政部主管',['新住民發展基金','研發及產業訓儲替代役基金','警察消防海巡移民空勤人員及協勤民力安全基金','國土永續發展基金']],['教育部主管',['學產基金','私立高級中等以上學校退場基金']],
+  ['法務部主管',['毒品防制基金']],['經濟部主管',['經濟特別收入基金','核能發電後端營運基金']],['交通部主管',['航港建設基金']],['核能安全委員會主管',['核子事故緊急應變基金']],
+  ['農業部主管',['農業特別收入基金']],['勞動部主管',['就業安定基金']],['衛生福利部主管',['衛生福利特別收入基金']],['環境部主管',['環境保護基金']],['文化部主管',['文化發展基金']],
+  ['運動部主管',['運動發展基金']],['金融監督管理委員會主管',['金融監督管理基金']],['海洋委員會主管',['海洋污染防治基金']],
+  ['國家通訊傳播委員會主管',['通訊傳播監督管理基金','有線廣播電視事業發展基金']],['公平交易委員會主管',['反托拉斯基金']]];
+const SFF=SFMAP.flatMap(([m,fs])=>fs.map(f=>[m,f]));
+const keyd=rows=>{const n={}; return rows.map(x=>[x.name+'#'+(n[x.name]=(n[x.name]||0)+1),x]);};   /* 同名科目依出現順序區分 */
+const fv=n=>Math.abs(n)<1e-9?'-':n.toLocaleString('en-US');
+/* 各單位科目聯集，保持出現順序 */
+function unionRows(us){ const ks=[], nm={}, hasV={};
+  us.forEach(r=>{ let p=-1; keyd(r.rows).forEach(([k,x])=>{ let i=ks.indexOf(k); if(i<0){ks.splice(p+1,0,k); nm[k]=x.name; i=p+1;} p=i; if(x.v.length) hasV[k]=1; }); });
+  return ks.map(k=>({k,name:nm[k],hasV:!!hasV[k]})); }
+const sumBy=(us,c)=>{const s={}; us.forEach(r=>keyd(r.rows).forEach(([k,x])=>s[k]=(s[k]||0)+num(x.v[c]))); return s;};
+/* %、比較增減交給驗算規則回填（驗算的「應為」即正確值）；skip 為 PDF 無此欄者 */
+function fillCalc(r,skip=[]){
+  for(let i=0;i<5;i++){ let n=0;
+    check(r).forEach(e=>{ const lab=(r.hd||TYPES[r.type].hd)[e.c]; if(skip.includes(e.c)||!/%|比較/.test(lab)||typeof e.exp!=='number'&&e.exp!=='-') return;
+      e.row.v[e.c]=e.exp==='-'?'-':/%/.test(lab)?e.exp.toFixed(2):fv(e.exp); n++; });
+    r.rows.forEach(x=>delete x.err); if(!n) break; }
+  r.E=check(r); return r;
+}
+function buildTot(rs){
+  const us=rs.filter(r=>!r.multi&&!r.gen), out=[], tag='〔單位表彙編〕';
+  const amtC=t=>TYPES[t].hd.map((h,c)=>/%|比較/.test(h)?-1:c).filter(c=>c>=0);
+  for(const [kind,has] of [['作業基金',f=>OFMAP[f]],['特別收入基金',f=>SFF.some(a=>a[1]===f)]]) for(const t of ['of01','of02','of03']){
+    const g=us.filter(r=>r.type===t&&has(r.fund)); if(!g.length) continue; const U=unionRows(g), L=TYPES[t].hd.length;
+    /* 依科目分列 */
+    const S=amtC(t).map(c=>[c,sumBy(g,c)]), skip=t==='of01'?[4,5]:[];
+    out.push(fillCalc({fund:kind+tag,type:t,gen:1,rows:U.map(u=>({name:u.name,v:u.hasV?[...Array(L)].map((_,c)=>{const s=S.find(a=>a[0]===c); return s&&!skip.includes(c)?fv(s[1][u.k]||0):'';}):[]}))},skip));
+    /* 多欄：作業基金依業務別、主管別；特別收入基金現金流量表依主管別（每基金一欄） */
+    const w=t==='of03'?1:2, s0=sumBy(g,0);
+    const dims=kind==='作業基金'?[['業務別',OF_BIZ,f=>OFMAP[f][0]],['主管機關別',OF_MGR,f=>OFMAP[f][1]]]
+      :t==='of03'?[['主管別',SFF.map(a=>a[0]+' '+a[1]),f=>SFF.findIndex(a=>a[1]===f)+1]]:[];
+    dims.forEach(([dn,names,col])=>{ const per=names.map((_,i)=>sumBy(g.filter(r=>col(r.fund)===i+1),0));
+      const nm=['合計',...names], hd=w===2?nm.flatMap(n=>[n+' 金額',n+' %']):nm;
+      out.push(fillCalc({fund:`${kind}（${dn}）${tag}`,type:t,gen:1,multi:true,w,names:nm,hd,
+        rows:U.map(u=>({name:u.name,v:u.hasV?[s0,...per].flatMap(s=>w===2?[fv(s[u.k]||0),'']:[fv(s[u.k]||0)]):[]}))})); });
+  }
+  /* 特別收入基金 SF-01：主管列＋基金列＋合計 */
+  const gf=f=>us.find(r=>r.type==='gf01'&&r.fund===f);
+  if(SFF.some(a=>gf(a[1]))){
+    const pick=(r,n)=>r&&r.rows.find(y=>n.startsWith('基金')?y.name===n:y.name.startsWith(n));
+    const vec=r=>{ const a=['基金來源','基金用途','本期賸餘'].map(n=>pick(r,n)), b=['期初基金餘額','解繳公庫','期末基金餘額'].map(n=>num(pick(r,n)?.v[0]));
+      const cy=a.map(x=>num(x?.v[0])), py=a.map(x=>num(x?.v[2])); return [...cy,...py,...cy.map((x,i)=>x-py[i]),...b]; };
+    const add=(a,b)=>a.map((x,i)=>x+b[i]), rows=[]; let tot=Array(12).fill(0);
+    SFMAP.forEach(([m,fs])=>{ const vs=fs.filter(gf).map(f=>[f,vec(gf(f))]); if(!vs.length) return; const mv=vs.reduce((a,[,v])=>add(a,v),Array(12).fill(0)); tot=add(tot,mv);
+      rows.push({name:m,v:mv.map(fv)},...vs.map(([f,v])=>({name:f,v:v.map(fv)}))); });
+    rows.push({name:'合計',v:tot.map(fv)});
+    const r={fund:'特別收入基金'+tag,type:'sf01',gen:1,rows}; r.E=check(r); out.push(r);
+  }
+  return out;
+}
 let RES=[];
 function render(){
   const errN=RES.reduce((s,r)=>s+r.E.filter(e=>!e.tail).length,0), tailN=RES.reduce((s,r)=>s+r.E.filter(e=>e.tail).length,0);
@@ -290,7 +347,7 @@ function exportXlsx(){
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['基金','報表','項目','欄位','應為','實為','類別','驗算'],...RES.flatMap(r=>r.E.map(e=>[r.fund,TYPES[r.type].t,e.row.name,e.col,e.exp,e.act,e.tail?'尾差':'錯誤',e.why]))]),'檢誤結果');
   RES.filter(r=>r.hd).forEach((r,i)=>XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['項目',...r.hd],...r.rows.map(x=>[x.name,...r.hd.map((_,c)=>x.v[c]==null?'':x.v[c]==='-'?'-':num(x.v[c]))])]),`綜計${i+1}`));   /* 多欄綜計表各自一張 */
   for(const k in TYPES){const rs=RES.filter(r=>r.type===k&&!r.hd); if(!rs.length) continue;
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['基金',k==='of01'?'科目':'項目',...TYPES[k].hd],...rs.flatMap(r=>r.rows.map(x=>[r.fund,x.name,...TYPES[k].hd.map((_,c)=>x.v[c]==null?'':x.v[c]==='-'?'-':num(x.v[c]))]))]),TYPES[k].t);}
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['基金',k==='of01'?'科目':'項目',...TYPES[k].hd],...rs.flatMap(r=>r.rows.map(x=>[r.fund,x.name,...TYPES[k].hd.map((_,c)=>x.v[c]==null?'':x.v[c]==='-'?'-':num(x.v[c]))]))]),TYPES[k].t+(k==='sf01'?'（基金別）':''));}
   XLSX.writeFile(wb,'報表數字檢誤.xlsx');
 }
 const inp=$('fa'), lab=inp.closest('label'), ready=()=>$('go').disabled=!inp.files.length;
@@ -302,6 +359,7 @@ $('go').onclick=async()=>{
   $('msg').textContent='解析中…'; RES=[];
   try{ for(const f of inp.files){ const rs=await parse(await f.arrayBuffer()); if(!rs.length) $('msg').textContent+=` ${f.name} 未找到可辨識的報表；`; rs.forEach(r=>{r.E=check(r);RES.push(r);}); }
     RES.push(...checkSum(RES));
+    if(!RES.some(r=>/^(作業基金|特別收入基金)(（|$)/.test(r.fund))) RES.push(...buildTot(RES));   /* 只傳單位表：由單位表彙編綜計表 */
     render(); $('xl').hidden=!RES.length; $('xl').onclick=exportXlsx; $('msg').textContent=$('msg').textContent.replace('解析中…','');
   }catch(e){ $('msg').textContent='解析失敗：'+e.message; console.error(e); }
 };
