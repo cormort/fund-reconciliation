@@ -16,7 +16,7 @@ td.num{text-align:right;white-space:nowrap}td.bad{background:var(--bad)}td.tail{
 <section class="card in"><h2>上傳 PDF</h2>
 <label class="f">報表 PDF（可多選，一個檔案可含多張報表）<small>拖曳檔案到這裡，或點選選擇</small><input type="file" id="fa" accept=".pdf" multiple></label>
 <button id="go" disabled>開始檢誤</button> <button id="xl" hidden>匯出 Excel</button> <span id="msg" class="small"></span>
-<p class="small">檔案只在瀏覽器內解析，不會上傳。依頁首標題自動判斷報表種類，支援單位表及綜計表（依科目分列、依業務別／主管別／基金別分列的對開頁），多欄綜計表另核「合計＝各欄加總」（作業基金收支餘絀表、餘絀撥補表、現金流量表；普通基金基金來源、用途及餘絀表、現金流量表）。單位表與綜計表一起上傳時另核散總：綜計表各科目＝各單位表同科目加總，特別收入基金綜計表各基金列＝該基金單位表。尾差容忍：前年度決算金額差 2 以內、百分比差 0.01 以內標黃色「尾差」，其餘差異標紅色「錯誤」。</p></section>
+<p class="small">檔案只在瀏覽器內解析，不會上傳。依頁首標題自動判斷報表種類，支援單位表及綜計表（依科目分列、依業務別／主管別／基金別分列的對開頁），多欄綜計表另核「合計＝各欄加總」（作業基金收支餘絀表、餘絀撥補表、現金流量表；普通基金基金來源、用途及餘絀表、現金流量表）。單位表與綜計表一起上傳時另核散總：綜計表各科目＝各單位表同科目加總，作業基金業務別、主管別綜計表各欄＝所屬基金單位表加總，特別收入基金綜計表各基金列＝該基金單位表。尾差容忍：前年度決算金額差 2 以內、百分比差 0.01 以內標黃色「尾差」，其餘差異標紅色「錯誤」。</p></section>
 <div id="out"></div></main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -216,6 +216,12 @@ function check(r){
   return E;
 }
 
+/* 作業基金：[業別編號, 主管編號]（業務別、主管別綜計表的欄序） */
+const OFMAP={行政院國家發展基金:[6,1],營建建設基金:[6,2],實施平均地權基金:[6,2],國軍生產及服務作業基金:[2,3],國軍老舊眷村改建基金:[5,3],國防醫學大學軍事教育基金:[1,3],
+  國立大學校院校務基金:[1,4],國立臺灣大學附設醫院作業基金:[2,4],國立成功大學附設醫院作業基金:[2,4],國立陽明交通大學附設醫院作業基金:[2,4],教育部所屬機構作業基金:[1,4],國立高級中等學校校務基金:[1,4],
+  法務部矯正機關作業基金:[5,5],經濟作業基金:[4,6],水資源作業基金:[5,6],交通作業基金:[4,7],國軍退除役官兵安置基金:[5,8],榮民醫療作業基金:[2,8],科學園區管理局作業基金:[4,9],
+  農業作業基金:[5,10],農田水利事業作業基金:[4,10],勞工保險局作業基金:[3,11],醫療藥品基金:[2,12],管制藥品製藥工廠作業基金:[5,12],全民健康保險基金:[3,12],國民年金保險基金:[3,12],
+  國立文化機構作業基金:[1,13],故宮文物藝術發展基金:[5,14],原住民族綜合發展基金:[7,15],考選業務基金:[7,16]};
 /* 散總：綜計表（依科目分列）各科目＝各單位表同科目加總；SF-01 各基金列＝該基金單位表 */
 function checkSum(rs){
   const out=[], isTot=r=>/^(作業基金|特別收入基金)$/.test(r.fund), units=rs.filter(r=>!r.multi&&!isTot(r));
@@ -229,6 +235,15 @@ function checkSum(rs){
     const R={fund:'散總　'+T.fund+`（${grp.length} 個基金）`,type:T.type,rows:T.rows.map(x=>({name:x.name,v:x.v})),E:[]};
     keyed(R.rows).forEach(([k,x])=>amt(T.type).forEach(c=>{ if(x.v[c]==null||x.v[c]==='') return;   /* 綜計表無此欄（前年度） */
       const e=sum[k]?.[c]||0, a=num(x.v[c]); if(Math.abs(e-a)>1e-9){R.E.push({row:x,c,col:TYPES[T.type].hd[c],exp:e,act:a,why:'各單位表加總',tail:false}); (x.err||(x.err={}))[c]='bad';} }));
+    out.push(R);
+  });
+  /* 作業基金業務別／主管別綜計表：各欄＝所屬基金單位表本年度加總（欄序＝業別／主管編號） */
+  rs.filter(r=>r.multi&&/^作業基金（(業務|主管)/.test(r.fund)).forEach(T=>{
+    const j=/業務/.test(T.fund)?0:1, w=T.w, grp=units.filter(r=>r.type===T.type&&OFMAP[r.fund]), sum={};
+    grp.forEach(r=>{const g=OFMAP[r.fund][j]; keyed(r.rows).forEach(([k,x])=>{(sum[k]||(sum[k]=[]))[g]=(sum[k][g]||0)+num(x.v[0]);});});
+    const R={fund:'散總　'+T.fund,type:T.type,hd:T.hd,rows:T.rows.map(x=>({name:x.name,v:x.v})),E:[]};
+    keyed(R.rows).forEach(([k,x])=>{ if(x.v.length!==T.hd.length) return; T.names.forEach((n,g)=>{ if(!g) return;
+      const e=sum[k]?.[g]||0, a=num(x.v[g*w]); if(e!==a){R.E.push({row:x,c:g*w,col:T.hd[g*w],exp:e,act:a,why:'所屬基金單位表加總',tail:false}); (x.err||(x.err={}))[g*w]='bad';} }); });
     out.push(R);
   });
   if(sf){ const R={fund:'散總　特別收入基金（各基金列）',type:'sf01',rows:sf.rows.map(x=>({name:x.name,v:x.v})),E:[]};
