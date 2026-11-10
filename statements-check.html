@@ -1,4 +1,4 @@
-<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>報表數字檢誤</title><style>
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>主要表綜計表檢誤</title><style>
 :root{--n:#17365d;--b:#2f75b5;--bg:#eef2f6;--line:#d8e0e7;--ink:#26343e;--bad:#f8d0d0;--tail:#fff2c2}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:"Microsoft JhengHei","Noto Sans TC",sans-serif;line-height:1.6}
 header{background:linear-gradient(135deg,#102a46,#2f75b5);color:#fff;padding:30px 16px}header div,main{max-width:1200px;margin:auto}h1{margin:0 0 6px}header a{color:#cfe3f5}
@@ -12,7 +12,7 @@ td.num{text-align:right;white-space:nowrap}td.bad{background:var(--bad)}td.tail{
 nav.tabs{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0}nav.tabs button{border:1px solid var(--line);background:#fff;color:var(--n);border-radius:6px;padding:6px 12px;cursor:pointer;font:inherit}nav.tabs button.on{background:var(--n);color:#fff;border-color:var(--n)}nav.tabs button.on .ng{color:#ffcdd2}
 @media print{header,.card.in{display:none}}
 </style></head><body>
-<header><div><h1>報表數字檢誤</h1><p>上傳各基金的收支餘絀表、餘絀撥補表、基金來源用途及餘絀表、現金流量表 PDF，自動驗算合計、百分比及比較增減。<br><a href="index.html">← 回專區</a></p></div></header>
+<header><div><h1>主要表綜計表檢誤</h1><p>上傳各基金的收支餘絀表、餘絀撥補表、基金來源用途及餘絀表、現金流量表 PDF，自動驗算合計、百分比及比較增減。<br><a href="index.html">← 回專區</a></p></div></header>
 <main>
 <section class="card in"><h2>上傳 PDF</h2>
 <label class="f">報表 PDF（可多選，一個檔案可含多張報表）<small>拖曳檔案到這裡，或點選選擇</small><input type="file" id="fa" accept=".pdf" multiple></label>
@@ -363,7 +363,7 @@ function exportXlsx(){
   RES.filter(r=>r.hd).forEach((r,i)=>XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['項目',...r.hd],...r.rows.map(x=>[x.name,...r.hd.map((_,c)=>x.v[c]==null?'':x.v[c]==='-'?'-':num(x.v[c]))])]),`綜計${i+1}`));   /* 多欄綜計表各自一張 */
   for(const k in TYPES){const rs=RES.filter(r=>r.type===k&&!r.hd); if(!rs.length) continue;
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['基金',k==='of01'?'科目':'項目',...TYPES[k].hd],...rs.flatMap(r=>r.rows.map(x=>[r.fund,x.name,...TYPES[k].hd.map((_,c)=>x.v[c]==null?'':x.v[c]==='-'?'-':num(x.v[c]))]))]),TYPES[k].t+(k==='sf01'?'（基金別）':''));}
-  XLSX.writeFile(wb,'報表數字檢誤.xlsx');
+  XLSX.writeFile(wb,'主要表綜計表檢誤.xlsx');
 }
 $('out').onclick=e=>{const b=e.target.closest('.tabs button'); if(!b) return; const g=b.dataset.g;
   $('out').querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b)); $('out').querySelectorAll('.tp').forEach(d=>d.hidden=d.dataset.g!==g);};
