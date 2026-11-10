@@ -16,7 +16,7 @@ td.num{text-align:right;white-space:nowrap}td.bad{background:var(--bad)}td.tail{
 <section class="card in"><h2>上傳 PDF</h2>
 <label class="f">報表 PDF（可多選，一個檔案可含多張報表）<small>拖曳檔案到這裡，或點選選擇</small><input type="file" id="fa" accept=".pdf" multiple></label>
 <button id="go" disabled>開始檢誤</button> <button id="xl" hidden>匯出 Excel</button> <span id="msg" class="small"></span>
-<p class="small">檔案只在瀏覽器內解析，不會上傳。依頁首標題自動判斷報表種類，支援單位表及綜計表（依科目分列、依業務別／主管別／基金別分列的對開頁），多欄綜計表另核「合計＝各欄加總」（作業基金收支餘絀表、餘絀撥補表、現金流量表；普通基金基金來源、用途及餘絀表、現金流量表）。尾差容忍：前年度決算金額差 2 以內、百分比差 0.01 以內標黃色「尾差」，其餘差異標紅色「錯誤」。</p></section>
+<p class="small">檔案只在瀏覽器內解析，不會上傳。依頁首標題自動判斷報表種類，支援單位表及綜計表（依科目分列、依業務別／主管別／基金別分列的對開頁），多欄綜計表另核「合計＝各欄加總」（作業基金收支餘絀表、餘絀撥補表、現金流量表；普通基金基金來源、用途及餘絀表、現金流量表）。單位表與綜計表一起上傳時另核散總：綜計表各科目＝各單位表同科目加總，特別收入基金綜計表各基金列＝該基金單位表。尾差容忍：前年度決算金額差 2 以內、百分比差 0.01 以內標黃色「尾差」，其餘差異標紅色「錯誤」。</p></section>
 <div id="out"></div></main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -216,6 +216,29 @@ function check(r){
   return E;
 }
 
+/* 散總：綜計表（依科目分列）各科目＝各單位表同科目加總；SF-01 各基金列＝該基金單位表 */
+function checkSum(rs){
+  const out=[], isTot=r=>/^(作業基金|特別收入基金)$/.test(r.fund), units=rs.filter(r=>!r.multi&&!isTot(r));
+  const sf=rs.find(r=>r.type==='sf01'), sfN=new Set(sf?sf.rows.map(x=>x.name):[]);
+  const ofN=new Set(units.filter(r=>r.type==='of01'&&!sfN.has(r.fund)).map(r=>r.fund));
+  const keyed=rows=>{const n={}; return rows.map(x=>[x.name+'#'+(n[x.name]=(n[x.name]||0)+1),x]);};   /* 同名科目（收取利息…）依出現順序區分 */
+  const amt=t=>TYPES[t].hd.map((h,c)=>/%/.test(h)?-1:c).filter(c=>c>=0);
+  rs.filter(r=>!r.multi&&isTot(r)&&r.type!=='sf01').forEach(T=>{
+    const mem=T.fund==='作業基金'?ofN:sfN, grp=units.filter(r=>r.type===T.type&&mem.has(r.fund)); if(!grp.length) return;
+    const sum={}; grp.forEach(r=>keyed(r.rows).forEach(([k,x])=>{const s=sum[k]||(sum[k]=[]); amt(T.type).forEach(c=>s[c]=(s[c]||0)+(c===6&&T.type==='of01'?num(x.v[0])-num(x.v[2]):num(x.v[c])));}));   /* 單位表本年上年異號時比較增減印「-」，綜計用實際差額 */
+    const R={fund:'散總　'+T.fund+`（${grp.length} 個基金）`,type:T.type,rows:T.rows.map(x=>({name:x.name,v:x.v})),E:[]};
+    keyed(R.rows).forEach(([k,x])=>amt(T.type).forEach(c=>{ if(x.v[c]==null||x.v[c]==='') return;   /* 綜計表無此欄（前年度） */
+      const e=sum[k]?.[c]||0, a=num(x.v[c]); if(Math.abs(e-a)>1e-9){R.E.push({row:x,c,col:TYPES[T.type].hd[c],exp:e,act:a,why:'各單位表加總',tail:false}); (x.err||(x.err={}))[c]='bad';} }));
+    out.push(R);
+  });
+  if(sf){ const R={fund:'散總　特別收入基金（各基金列）',type:'sf01',rows:sf.rows.map(x=>({name:x.name,v:x.v})),E:[]};
+    const MP=[['基金來源',[0,3]],['基金用途',[1,4]],['本期賸餘',[2,5]],['期初基金餘額',[9]],['解繳公庫',[10]],['期末基金餘額',[11]]];
+    R.rows.forEach(x=>{ const u=units.find(r=>r.type==='gf01'&&r.fund===x.name); if(!u) return;
+      MP.forEach(([n,cs])=>{ const ur=u.rows.find(y=>n.startsWith('基金')?y.name===n:y.name.startsWith(n)); if(!ur) return;
+        cs.forEach((c,i)=>{ const e=num(ur.v[i*2]), a=num(x.v[c]); if(e!==a){R.E.push({row:x,c,col:TYPES.sf01.hd[c],exp:e,act:a,why:'該基金單位表'+n,tail:false}); (x.err||(x.err={}))[c]='bad';} }); }); });
+    out.push(R); }
+  return out;
+}
 let RES=[];
 function render(){
   const errN=RES.reduce((s,r)=>s+r.E.filter(e=>!e.tail).length,0), tailN=RES.reduce((s,r)=>s+r.E.filter(e=>e.tail).length,0);
@@ -248,6 +271,7 @@ addEventListener('dragover',e=>e.preventDefault());addEventListener('drop',e=>e.
 $('go').onclick=async()=>{
   $('msg').textContent='解析中…'; RES=[];
   try{ for(const f of inp.files){ const rs=await parse(await f.arrayBuffer()); if(!rs.length) $('msg').textContent+=` ${f.name} 未找到可辨識的報表；`; rs.forEach(r=>{r.E=check(r);RES.push(r);}); }
+    RES.push(...checkSum(RES));
     render(); $('xl').hidden=!RES.length; $('xl').onclick=exportXlsx; $('msg').textContent=$('msg').textContent.replace('解析中…','');
   }catch(e){ $('msg').textContent='解析失敗：'+e.message; console.error(e); }
 };
