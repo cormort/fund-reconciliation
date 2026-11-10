@@ -251,6 +251,11 @@ function checkSum(rs){
       const e=sum[k]?.[g]||0, a=num(x.v[g*w]); if(e!==a){R.E.push({row:x,c:g*w,col:T.hd[g*w],exp:e,act:a,why:'所屬基金單位表加總',tail:false}); (x.err||(x.err={}))[g*w]='bad';} }); });
     out.push(R);
   });
+  /* 單位基金的基金別表（如國立大學校院校務基金各校）：合計欄＝同基金項目表本年度 */
+  rs.filter(r=>r.multi&&!isTot(r)&&/（基金別）$/.test(r.fund)).forEach(T=>{ const S=rs.find(r=>!r.multi&&r.type===T.type&&r.fund===T.fund.replace('（基金別）','')); if(!S) return;
+    const R={fund:'散總　'+T.fund+'合計＝項目表',type:T.type,hd:T.hd,rows:T.rows.map(x=>({name:x.name,v:x.v})),E:[]}, sv=Object.fromEntries(keyed(S.rows));
+    keyed(R.rows).forEach(([k,x])=>{ if(!x.v.length) return; const e=num(sv[k]?.v[0]), a=num(x.v[0]); if(e!==a){R.E.push({row:x,c:0,col:T.hd[0],exp:e,act:a,why:'項目表本年度',tail:false}); (x.err||(x.err={}))[0]='bad';} });
+    out.push(R); });
   if(sf){ const R={fund:'散總　特別收入基金（各基金列）',type:'sf01',rows:sf.rows.map(x=>({name:x.name,v:x.v})),E:[]};
     const MP=[['基金來源',[0,3]],['基金用途',[1,4]],['本期賸餘',[2,5]],['期初基金餘額',[9]],['解繳公庫',[10]],['期末基金餘額',[11]]];
     R.rows.forEach(x=>{ const u=units.find(r=>r.type==='gf01'&&r.fund===x.name); if(!u) return;
