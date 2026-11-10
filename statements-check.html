@@ -334,7 +334,9 @@ function buildTot(rs){
 let RES=[];
 function render(){
   /* 摘要後先綜計表（含基金別多欄表、散總），再各基金 */
-  const rk=r=>/^散總/.test(r.fund)?2:r.gen||/^(作業基金|特別收入基金)(（|$)/.test(r.fund)?0:r.multi?1:3; RES=RES.map((r,i)=>[r,i]).sort((a,b)=>rk(a[0])-rk(b[0])||a[1]-b[1]).map(a=>a[0]);
+  const rk=r=>/^散總/.test(r.fund)?2:r.gen||/^(作業基金|特別收入基金)(（|$)/.test(r.fund)?0:r.multi?1:3; /* 各基金依基金編號（作業基金 1–30，再特別收入基金依 SF-01 序），同基金依報表種類 */
+  const FO=[...Object.keys(OFMAP),...SFF.map(a=>a[1])], fo=r=>{const i=FO.indexOf(r.fund); return i<0?999:i;}, to=r=>['of01','gf01','of02','of03','sf01'].indexOf(r.type);
+  RES=RES.map((r,i)=>[r,i]).sort((a,b)=>rk(a[0])-rk(b[0])||(rk(a[0])===3?fo(a[0])-fo(b[0])||to(a[0])-to(b[0]):0)||a[1]-b[1]).map(a=>a[0]);
   const errN=RES.reduce((s,r)=>s+r.E.filter(e=>!e.tail).length,0), tailN=RES.reduce((s,r)=>s+r.E.filter(e=>e.tail).length,0);
   let h=`<section class="card"><h2>檢誤摘要</h2><p>共 ${RES.length} 張報表；錯誤 <span class="ng">${errN}</span>、尾差 ${tailN}。</p><div class="wrap"><table><tr><th>基金</th><th>報表</th><th>結果</th></tr>`;
   RES.forEach(r=>{const e=r.E.filter(x=>!x.tail).length,t=r.E.length-e; h+=`<tr><td>${esc(r.fund)}</td><td>${TYPES[r.type].t}</td><td>${!r.rows.length?'<span class="ng">未解析到資料</span>':e?`<span class="ng">錯誤 ${e}</span>`:'<span class="ok">通過</span>'}${t?`（尾差 ${t}）`:''}</td></tr>`;});
