@@ -140,6 +140,8 @@ function levels(R){ let num2=false;
     if(/[\u3400-\u4DBF\u1C00-\u1FFF\u2500-\u25FF]/.test(n)&&R[i+1]&&isF(R[i+1].name)) return 0;   /* 無法解碼的主管名稱 */ if(i===R.length-1&&R.length>2) return -1;
     return num2?3:2; }); }
 function checkRef(r){
+  /* 無法解碼的主管名稱：依下一列基金在作業基金對照表的主管補回 */
+  r.rows.forEach((x,i)=>{ const nx=r.rows[i+1]; if(/[\u3400-\u4DBF\u1C00-\u1FFF\u2500-\u25FF]/.test(x.name)&&nx&&OFMAP[nx.name]) x.name=OF_MGR[OFMAP[nx.name][1]-1]; });
   const E=[], hd=TYPES[r.type].hd, add=(x,c,e,why)=>{ const a=num(x.v[c]); if(Math.abs(a-e)>1e-9){E.push({row:x,c,col:hd[c].replace(' ',''),exp:e,act:a,why,tail:false}); (x.err||(x.err={}))[c]='bad';} };
   const R=r.rows, n=(x,c)=>num(x.v[c]), sm=(x,a,b)=>{let t=0; for(let c=a;c<=b;c++) t+=n(x,c); return t;};
   R.forEach(x=>{ if(r.type==='ep') add(x,9,sm(x,0,8),'各項用人費用加總'); else if(r.type==='em') add(x,8,sm(x,0,7),'專任人員各類加總'); else if(r.type==='fa'){ add(x,0,sm(x,1,10),'各資產欄加總'); add(x,11,sm(x,12,15),'各資金來源加總'); add(x,11,n(x,0),'資金來源合計＝資產合計'); }
