@@ -16,7 +16,7 @@ td.num{text-align:right;white-space:nowrap}td.bad{background:var(--bad)}td.tail{
 <section class="card in"><h2>上傳 PDF</h2>
 <label class="f">報表 PDF（可多選，一個檔案可含多張報表）<small>拖曳檔案到這裡，或點選選擇</small><input type="file" id="fa" accept=".pdf" multiple></label>
 <button id="go" disabled>開始檢誤</button> <button id="xl" hidden>匯出 Excel</button> <span id="msg" class="small"></span>
-<p class="small">檔案只在瀏覽器內解析，不會上傳。依頁首標題自動判斷報表種類，支援單位表及綜計表（依科目分列、依業務別／主管別／基金別分列的對開頁），多欄綜計表另核「合計＝各欄加總」（作業基金收支餘絀表、餘絀撥補表、現金流量表；普通基金基金來源、用途及餘絀表、現金流量表）。單位表與綜計表一起上傳時另核散總：綜計表各科目＝各單位表同科目加總，作業基金業務別、主管別綜計表各欄＝所屬基金單位表加總，特別收入基金綜計表各基金列＝該基金單位表。尾差容忍：前年度決算金額差 2 以內、百分比差 0.01 以內標黃色「尾差」，其餘差異標紅色「錯誤」。</p></section>
+<p class="small">檔案只在瀏覽器內解析，不會上傳。依頁首標題自動判斷報表種類，支援單位表及綜計表（依科目分列、依業務別／主管別／基金別分列的對開頁），多欄綜計表另核「合計＝各欄加總」（作業基金收支餘絀表、餘絀撥補表、現金流量表；普通基金基金來源、用途及餘絀表、現金流量表）。單位表與綜計表一起上傳時另核散總：綜計表各科目＝各單位表同科目加總，作業基金業務別、主管別綜計表各欄＝所屬基金單位表加總，特別收入基金綜計表各基金列、主管別現金流量表各基金欄＝該基金單位表。尾差容忍：前年度決算金額差 2 以內、百分比差 0.01 以內標黃色「尾差」，其餘差異標紅色「錯誤」。</p></section>
 <div id="out"></div></main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -238,9 +238,11 @@ function checkSum(rs){
     out.push(R);
   });
   /* 作業基金業務別／主管別綜計表：各欄＝所屬基金單位表本年度加總（欄序＝業別／主管編號） */
-  rs.filter(r=>r.multi&&/^作業基金（(業務|主管)/.test(r.fund)).forEach(T=>{
-    const j=/業務/.test(T.fund)?0:1, w=T.w, grp=units.filter(r=>r.type===T.type&&OFMAP[r.fund]), sum={};
-    grp.forEach(r=>{const g=OFMAP[r.fund][j]; keyed(r.rows).forEach(([k,x])=>{(sum[k]||(sum[k]=[]))[g]=(sum[k][g]||0)+num(x.v[0]);});});
+  /* 特別收入基金主管別現金流量表：每基金一欄，欄序同 SF-01 基金列 */
+  const sfF=sf?sf.rows.map(x=>x.name).filter(n=>!/主管$|^(合計|總計)/.test(n)):[];
+  rs.filter(r=>r.multi&&(/^作業基金（(業務|主管)/.test(r.fund)||/^特別收入基金/.test(r.fund)&&sfF.length===r.names.length-1)).forEach(T=>{
+    const col=/^特別/.test(T.fund)?f=>sfF.indexOf(f)+1||null:f=>OFMAP[f]?.[/業務/.test(T.fund)?0:1], w=T.w, grp=units.filter(r=>r.type===T.type&&col(r.fund)), sum={};
+    grp.forEach(r=>{const g=col(r.fund); keyed(r.rows).forEach(([k,x])=>{(sum[k]||(sum[k]=[]))[g]=(sum[k][g]||0)+num(x.v[0]);});});
     const R={fund:'散總　'+T.fund,type:T.type,hd:T.hd,rows:T.rows.map(x=>({name:x.name,v:x.v})),E:[]};
     keyed(R.rows).forEach(([k,x])=>{ if(x.v.length!==T.hd.length) return; T.names.forEach((n,g)=>{ if(!g) return;
       const e=sum[k]?.[g]||0, a=num(x.v[g*w]); if(e!==a){R.E.push({row:x,c:g*w,col:T.hd[g*w],exp:e,act:a,why:'所屬基金單位表加總',tail:false}); (x.err||(x.err={}))[g*w]='bad';} }); });
