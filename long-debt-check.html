@@ -1,4 +1,4 @@
-<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>長期債務項目核對</title><style>
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>長期債務舉借及償還綜計表核對</title><style>
 :root{--n:#17365d;--b:#2f75b5;--bg:#eef2f6;--line:#d8e0e7;--ink:#26343e;--add:#d9f2d0;--del:#f8d0d0}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:"Microsoft JhengHei","Noto Sans TC",sans-serif;line-height:1.6}
 header{background:linear-gradient(135deg,#102a46,#2f75b5);color:#fff;padding:30px 16px}header div,main{max-width:1200px;margin:auto}h1{margin:0 0 6px}header a{color:#cfe3f5}
@@ -11,7 +11,7 @@ table{width:100%;border-collapse:collapse;font-size:.9rem}th{background:var(--n)
 ins{background:var(--add);text-decoration:none}del{background:var(--del)}.wrap{overflow-x:auto}table.chg td:nth-last-child(3){white-space:nowrap}
 @media(max-width:700px){.drop{grid-template-columns:1fr}}@media print{header,.card.in{display:none}th{position:static}}
 </style></head><body>
-<header><div><h1>長期債務項目核對</h1><p>上傳兩個年度的「長期債務舉借及償還綜計表」PDF，比對各借款項目的債權人、借款年度及償還期間有無差異。<br><a href="index.html">← 回專區</a></p></div></header>
+<header><div><h1>長期債務舉借及償還綜計表核對</h1><p>上傳兩個年度的「長期債務舉借及償還綜計表」PDF，比對各借款項目的債權人、借款年度及償還期間有無差異。<br><a href="index.html">← 回專區</a></p></div></header>
 <main>
 <section class="card in"><h2>上傳 PDF</h2><div class="drop">
 <label class="f">上年度 PDF<small>拖曳檔案到這裡，或點選選擇</small><input type="file" id="fa" accept=".pdf"></label>
@@ -33,8 +33,8 @@ const F=['債權人','借款年度','償還起','償還止'];
 
 // 單頁表：基金名稱及借款項目｜債權人｜借款年度｜償還期間 起 止｜本年度舉借數｜本年度償還數｜備註
 async function parse(buf){
-  const doc=await pdfjsLib.getDocument({data:buf}).promise, out=[];
-  let year='', cur={m:'',f:''}, last=null, lastHd=null;
+  const doc=await pdfjsLib.getDocument({data:buf,cMapUrl:'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/',cMapPacked:true}).promise, out=[], ALL=[];
+  let year='', cur={m:'',f:''}, last=null, lastHd=null, lastA=null, note='', inNote=false;
   for(let p=1;p<=doc.numPages;p++){
     const pg=await doc.getPage(p), H=pg.getViewport({scale:1}).height;
     const raw=(await pg.getTextContent()).items.filter(i=>i.str.trim()||(i.str&&i.width<4))
@@ -52,24 +52,40 @@ async function parse(buf){
       // 隱藏的殘字：行首一小段文字，同一行右邊又出現以它開頭的文字（115 年度「生　生宿舍新建工程」），只留右邊那段
       for(let k=l.length-1;k>=0;k--){const i=l[k]; if(i.x<credL&&l.some(j=>j!==i&&j.x<credL&&j.x>i.x+i.w+20&&j.t.startsWith(i.t))) l.splice(k,1);}
       const name=l.filter(i=>i.x<credL).map(i=>i.t).join(''), cred=l.filter(i=>i.x>=credL&&i.x<yearL).map(i=>i.t).join('');
-      if(/^合計|^註/.test(norm(name))) break;
+      const am=l.filter(i=>i.x>=amtL&&isAmt(i.t)).map(i=>({e:i.x+i.w,v:toNum(i.t)}));
+      if(/^合計/.test(norm(name))){ ALL.push({lv:-1,name:'合計',am}); inNote=true; continue; } if(/^註/.test(norm(name))){ inNote=true; } if(inNote){ note+=norm(l.map(i=>i.t).join('')); continue; }
       const yrs=l.filter(i=>i.x>=yearL&&i.x<amtL&&YR.test(i.t)).map(i=>i.t), amts=l.filter(i=>i.x>=amtL&&isAmt(i.t)).map(i=>toNum(i.t));
       const x0=l[0].x;
       if(!yrs.length&&!amts.length){   // 續行：名稱或債權人換行
-        if(last&&x0>=50){last.name+=name;last.v['債權人']+=cred;} else if(lastHd&&name) lastHd.k==='m'?(cur.m+=name):(cur.f+=name);
+        if(last&&x0>=50){last.name+=name;last.v['債權人']+=cred;if(lastA)lastA.name+=name;} else if(lastHd&&name){ lastHd.k==='m'?(cur.m+=name):(cur.f+=name); if(lastA) lastA.name+=name; }
         continue;
       }
-      if(x0<38){cur={m:name,f:''};lastHd={k:'m'};last=null;continue;}
-      if(x0<50){cur.f=name;lastHd={k:'f'};last=null;continue;}
+      if(x0<38){cur={m:name,f:''};lastHd={k:'m'};last=null;ALL.push(lastA={lv:0,name,am});continue;}
+      if(x0<50){cur.f=name;lastHd={k:'f'};last=null;ALL.push(lastA={lv:1,name,am});continue;}
       // 借款年度可能缺，起止一定在最後兩格
       const [st,en]=yrs.slice(-2), yr=yrs.length>2?yrs[0]:'';
       last={m:cur.m,f:cur.f,name,v:{'債權人':cred,'借款年度':yr,'償還起':st||'','償還止':en||''},borrow:amts[0]||0,repay:amts[1]||0};
-      out.push(last); lastHd=null;
+      out.push(last); lastHd=null; ALL.push(lastA={lv:2,name,am,v:last.v,nyr:yrs.length});
     }
   }
   out.forEach(r=>{r.m=norm(r.m);r.f=norm(r.f);r.item=norm(r.name).replace(/^[（(][一二三四五六七八九十]+[）)]/,'');r.v['債權人']=norm(r.v['債權人']);});
-  return {year,rows:out};
+  return {year,rows:out,self:selfCheck(ALL,note)};
 }
+// 表內勾稽：主管＝所屬基金、基金＝所屬借款項目、合計＝各主管（舉借數、償還數）；空白格：每格應有數字或「-」，借款項目另需債權人、借款年度、償還起止
+function selfCheck(A,note=''){
+  const two=A.filter(r=>r.am.length===2), med=k=>{const a=two.map(r=>r.am[k].e).sort((p,q)=>p-q); return a[a.length>>1];}, cx=two.length?[med(0),med(1)]:null, C=['本年度舉借數','本年度償還數'], E=[];
+  A.forEach(r=>{ r.val=[null,null]; r.am.forEach(a=>{ const k=cx?(Math.abs(a.e-cx[0])<Math.abs(a.e-cx[1])?0:1):r.am.indexOf(a); r.val[k]=a.v; });
+    r.name=norm(r.name); r.val.forEach((v,k)=>{ if(v==null) E.push([r.name,C[k],'數字或「-」','空白','空白格']); });
+    if(r.lv===2){ if(!r.v['債權人']) E.push([r.name,'債權人','文字','空白','空白格']); if(r.nyr<3){ const k=r.nyr<2?'償還期間':'借款年度', it=r.name.replace(/^[（(][一二三四五六七八九十]+[）)]/,''); E.push([r.name,k,'年度','空白',note.includes(it)&&note.includes('未列示'+k)?'空白格（表下已註明）':'空白格']); } } });
+  const g=(r,k)=>r.val[k]||0;
+  A.forEach((r,i)=>{ if(r.lv<0||r.lv===2) return; const d=[]; for(let j=i+1;j<A.length&&A[j].lv>r.lv;j++) if(A[j].lv===r.lv+1) d.push(A[j]); if(!d.length) return;
+    [0,1].forEach(k=>{ const e=d.reduce((a,x)=>a+g(x,k),0); if(e!==g(r,k)) E.push([r.name,C[k],e,g(r,k),r.lv?'所屬借款項目加總':'所屬基金加總']); }); });
+  const tot=A.find(r=>r.lv<0), ms=A.filter(r=>r.lv===0);
+  if(tot) [0,1].forEach(k=>{ const e=ms.reduce((a,x)=>a+g(x,k),0); if(e!==g(tot,k)) E.push(['合計',C[k],e,g(tot,k),'各主管加總']); });
+  return {n:A.length,E};
+}
+const selfHtml=d=>{const ng=d.self.E.filter(e=>!/已註明/.test(e[4])).length, ok=d.self.E.length-ng; return `<section class="card"><h2>${d.year}年度表內勾稽（${d.self.n} 列，${ng?`<span style="color:#c62828">錯誤 ${ng}</span>`:'全部相符'}${ok?`，表下已註明 ${ok}`:''}）</h2><p class="small">主管＝所屬基金、基金＝所屬借款項目、合計＝各主管（本年度舉借數、償還數）；每個數字格應為數字或「-」，借款項目另需有債權人、借款年度、償還期間起止，空白列為錯誤。</p>`
+  +(d.self.E.length?`<div class="wrap"><table><thead><tr><th>列</th><th>欄位</th><th>應為</th><th>實為</th><th>驗算</th></tr></thead><tbody>${d.self.E.map(e=>`<tr><td>${esc(e[0])}</td><td>${e[1]}</td><td class="num">${typeof e[2]==='number'?fmt(e[2]):e[2]}</td><td class="num">${typeof e[3]==='number'?fmt(e[3]):e[3]}</td><td>${e[4]}</td></tr>`).join('')}</tbody></table></div>`:'')+'</section>';};
 
 function diff(a,b){
   const n=a.length,m=b.length,d=Array.from({length:n+1},()=>new Uint16Array(m+1));
@@ -113,7 +129,7 @@ function exportXlsx(name){
     XLSX.utils.book_append_sheet(wb,XLSX.utils.table_to_sheet(t),nm);});
   XLSX.writeFile(wb,name+'.xlsx');
 }
-const ready=()=>$('go').disabled=!($('fa').files[0]&&$('fb').files[0]);
+const ready=()=>$('go').disabled=!($('fa').files[0]||$('fb').files[0]);
 $('fa').onchange=$('fb').onchange=ready;
 document.querySelectorAll('label.f').forEach(l=>{const inp=l.querySelector('input');
   l.ondragover=e=>{e.preventDefault();l.classList.add('over');};
@@ -123,10 +139,11 @@ addEventListener('dragover',e=>e.preventDefault());addEventListener('drop',e=>e.
 $('go').onclick=async()=>{
   $('msg').textContent='解析中…';
   try{
-    let [a,b]=await Promise.all([$('fa'),$('fb')].map(async e=>parse(await e.files[0].arrayBuffer())));
-    if(+a.year>+b.year)[a,b]=[b,a];
-    report(a,b); $('msg').textContent='';
-    $('xl').hidden=false; $('xl').onclick=()=>exportXlsx(`長期債務項目核對_${a.year}-${b.year}`);
+    let [a,b]=await Promise.all([$('fa'),$('fb')].map(e=>e.files[0]).filter(Boolean).map(async f=>parse(await f.arrayBuffer())));
+    if(b&&+a.year>+b.year)[a,b]=[b,a];
+    if(b) report(a,b); else $('out').innerHTML='<section class="card"><p class="small">只上傳一個年度，只做表內勾稽。</p></section>';
+    $('out').insertAdjacentHTML('afterbegin',[a,b].filter(Boolean).map(selfHtml).join('')); $('msg').textContent='';
+    $('xl').hidden=false; $('xl').onclick=()=>exportXlsx(`長期債務項目核對_${a.year}${b?'-'+b.year:''}`);
   }catch(e){$('msg').textContent='解析失敗：'+e.message;console.error(e);}
 };
 </script></body></html>
