@@ -13,7 +13,7 @@ table{width:100%;border-collapse:collapse;font-size:.88rem}th{background:var(--n
 <section class="card"><h2>上傳 Excel</h2>
 <label class="f">綜計表檔案（.xlsx／.xls／.ods，可多選）<small>拖曳檔案到這裡，或點選選擇</small><input type="file" id="fa" accept=".xlsx,.xls,.ods" multiple></label>
 <button id="go" disabled>開始檢誤</button> <button id="xl" hidden>匯出 Excel</button> <span id="msg" class="small"></span>
-<p class="small">檔案只在瀏覽器內解析，不會上傳。依標題自動判斷：損益、盈虧撥補、現金流量綜計表（依科目／項目分列、依業別分列、依主管機關別分列）。檢查：總計欄＝各業別（主管）欄加總；%＝金額÷基準列（營業收入、盈餘之部、分配之部等 % 為 100 之列），差 0.01 以內視為相符；比較增減 %＝（本年度－上年度）÷上年度；同時上傳時另核依業別、依主管機關別之總計欄＝依科目分列之本年度預算數。檔案來源：<a href="https://www.dgbas.gov.tw/News_Content.aspx?n=3626&s=236566">主計總處 116 年度國營事業預算</a>。</p></section>
+<p class="small">檔案只在瀏覽器內解析，不會上傳。依標題自動判斷：損益、盈虧撥補、現金流量綜計表（依科目／項目分列、依業別分列、依主管機關別分列）。檢查：總計欄＝各業別（主管）欄加總；%＝金額÷基準列（營業收入、盈餘之部、分配之部等 % 為 100 之列），差 0.01 以內視為相符；比較增減 %＝（本年度－上年度）÷上年度；同時上傳時另核依業別、依主管機關別之總計欄＝依科目分列之本年度預算數。其餘綜計表及參考表（財務摘要、營業利益、淨利、繳庫盈餘、固定資產、資產變賣、長期債務、轉投資、資本增減、成本效益分析、資本股額、員工人數、用人費用、稅捐規費）用通用檢誤：總計＝各主管、主管＝所屬事業、上層計畫＝所屬計畫、國內＋國外部分；小計／合計欄＝左側各欄；% 及增減欄自動找出公式（如 金額÷合計、（本年度－上年度）÷上年度）後逐列驗算，空白格不報。決算數差 2 以內標「尾差」。檔案來源：<a href="https://www.dgbas.gov.tw/News_Content.aspx?n=3626&s=236566">主計總處 116 年度國營事業預算</a>。</p></section>
 <div id="out"></div></main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
@@ -65,8 +65,52 @@ function cross(rs){ const out=[];
       out.push({kind,by:m.by,rows:[],E,x:`依${m.by}分列↔依${s.by}分列勾稽`}); }); }
   return out;
 }
+/* 其餘綜計表：通用檢誤（層級加總、小計／合計欄、%／增減欄以資料擬合找出公式） */
+const colN=c=>{let s='';for(c++;c;c=(c-1)/26|0)s=String.fromCharCode(65+(c-1)%26)+s;return s;};
+function parseGeneric(aoa){
+  const title=T(aoa.slice(0,2).flat().join('')).replace(/單位[:：].*$/,'').replace(/^.*?([^、\d]*綜計表[^丁]*?)(丁.*)?$/,'$1').replace(/^[\d丁]+、?/,'');
+  if(!/綜計表|財務摘要/.test(title)) return null;
+  const txt=c=>{const s=T(c); return s&&N(c)==null&&!/^\d+\.$/.test(s)?s:'';};
+  const cells=aoa.map(r=>(r||[]).map(N)), nameOf=r=>{for(let i=0;i<r.length;i++){const s=txt(r[i]); if(s) return [s,i];} return ['',-1];};
+  const d=aoa.findIndex((r,i)=>nameOf(r)[0]&&cells[i].some(v=>v!=null)&&!/單位/.test(T((r||[]).join(''))));
+  if(d<0) return null;
+  const u=aoa.findIndex(r=>/單位/.test(T((r||[]).join('')))), W=Math.max(...aoa.map(r=>r?.length||0));
+  const hd=[...Array(W)].map((_,c)=>aoa.slice(u+1,d).map(r=>T(r?.[c])).filter(Boolean).join('/'));
+  /* 資料列 */
+  const rows=[]; aoa.forEach((r,i)=>{ if(i<d) return; const [name,col]=nameOf(r); if(!name||!cells[i].some(v=>v!=null)) return;
+    const rank=/^(合計|總計)$/.test(name)?0:/主管$/.test(name)?1:/(公司|銀行|印刷廠)$/.test(name)?2:3;
+    rows.push({name,col,lv:rank<=1?rank:col*10+rank,v:cells[i]});   /* 總計、主管不論縮排皆為最上層 */ });
+  const numC=[...Array(W)].map((_,c)=>c).filter(c=>rows.some(x=>x.v[c]!=null));
+  const isPct=c=>/%|％|率|\(元\)|年限|每股/.test(hd[c])||!hd[c]&&rows.every(x=>x.v[c]==null||Math.abs(x.v[c])<=100.01)||rows.every(x=>x.v[c]==null||Math.abs(x.v[c])<=1000)&&rows.some(x=>x.v[c]!=null&&!Number.isInteger(x.v[c]));
+  const pctC=numC.filter(isPct), amtC=numC.filter(c=>!isPct(c)), E=[], lab=c=>`${colN(c)}欄${hd[c]?' '+hd[c]:''}`;
+  const err=(x,c,exp,why)=>E.push({row:x.name,col:lab(c),exp,act:x.v[c]??'空白',why:(Math.abs(z(x.v[c])-exp)<=2&&/決算/.test(hd[c])?'尾差（決算數 ±2 以內）：':'')+why}), z=v=>v||0;
+  /* 層級：總計＝各主管、主管＝所屬事業；縮排表／國內外部分：上層＝直屬下層 */
+  rows.forEach((p,i)=>{ const ch=[]; for(let j=i+1;j<rows.length&&rows[j].lv>p.lv;j++) ch.push(rows[j]); if(!ch.length) return;
+    const m=Math.min(...ch.map(x=>x.lv)), dc=ch.filter(x=>x.lv===m);
+    const ok=p.lv%10<=1||dc.every(x=>/^國[內外]部分$/.test(x.name))||(new Set(ch.map(x=>x.col)).size>1||p.lv%10===3)&&dc.every(x=>x.col>p.col);
+    if(!ok||(p.lv%10===0&&dc[0].lv%10!==1)) return;
+    amtC.forEach(c=>{ const s=dc.reduce((a,x)=>a+z(x.v[c]),0); if(Math.abs(z(p.v[c])-s)>0.5) err(p,c,s,`${p.name}＝${dc.map(x=>x.name).join('＋').slice(0,60)}`); }); });
+  /* 擬合：選對最多列的公式，至少 3 列且 ≥75% 相符才採用，不符列報錯 */
+  const fit=(c,cands)=>{ let best=null; for(const f of cands){ let n=0,ok=0; const bad=[];
+      for(const x of rows){ const e=f.f(x.v); if(e==null||x.v[c]==null) continue;   /* ponytail: 空白不報（基數為負、正負易位等慣例留白） */ n++; if(Math.abs(z(x.v[c])-e)<=f.tol) ok++; else bad.push([x,e]); }
+      if(ok>=3&&ok/n>=0.75&&(!best||ok>best.ok)) best={...f,ok,bad}; }
+    best?.bad.forEach(([x,e])=>err(x,c,f2(e),best.why)); };
+  const f2=e=>Math.round(e*100)/100;
+  amtC.filter(c=>/(小計|合計)$/.test(hd[c])).forEach(c=>{ const L=amtC.filter(k=>k<c).reverse(), cs=[];
+    for(let k=2;k<=L.length;k++){ const g=L.slice(0,k); cs.push({f:v=>g.reduce((a,j)=>a+z(v[j]),0),tol:0.5,why:`${colN(c)}＝${g.map(colN).reverse().join('＋')}`}); }
+    fit(c,cs); });
+  [...pctC,...amtC.filter(c=>/增減|盈餘或虧損/.test(hd[c]))].forEach(c=>{ const cs=[], A=amtC.filter(k=>k!==c);
+    for(const x of A) for(const y of A) if(x!==y){
+      if(pctC.includes(c)&&/增減數/.test(hd[c])) cs.push({f:v=>v[x]==null&&v[y]==null?null:z(v[x])-z(v[y]),tol:0.0100001,why:`${colN(c)}＝${colN(x)}－${colN(y)}`});
+      if(pctC.includes(c)){ cs.push({f:v=>v[y]?v[x]==null&&v[c]==null?null:z(v[x])/v[y]*100:null,tol:0.0100001,why:`${colN(c)}＝${colN(x)}÷${colN(y)}`});
+        cs.push({f:v=>v[y]?(z(v[x])-v[y])/v[y]*100:null,tol:0.0100001,why:`${colN(c)}＝（${colN(x)}－${colN(y)}）÷${colN(y)}`});
+        cs.push({f:v=>v[y]?(z(v[x])-v[y])/Math.abs(v[y])*100:null,tol:0.0100001,why:`${colN(c)}＝（${colN(x)}－${colN(y)}）÷${colN(y)}`}); }
+      else cs.push({f:v=>v[x]==null&&v[y]==null?null:z(v[x])-z(v[y]),tol:0.5+(Number.isInteger(rows[0]?.v[c]??0)?0:0.01),why:`${colN(c)}＝${colN(x)}－${colN(y)}`}); }
+    fit(c,cs.map(f=>({...f,f:v=>{const e=f.f(v); return e==null?null:f.tol<0.1?f2(e):e;}}))); });
+  return {kind:title,by:'',rows,E,x:'通用檢誤'};
+}
 // core-end
-const nm=r=>`${r.kind}綜計表（${r.x||'依'+r.by+'分列'}）`;
+const nm=r=>r.x==='通用檢誤'?r.kind:`${r.kind}綜計表（${r.x||'依'+r.by+'分列'}）`;
 const $=id=>document.getElementById(id), esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])), fmt=n=>typeof n==='number'?n.toLocaleString('en-US',{maximumFractionDigits:2}):n;
 let RES=[];
 function render(){ const n=RES.reduce((s,r)=>s+r.E.length,0);
@@ -88,7 +132,7 @@ lab.ondrop=e=>{e.preventDefault();lab.classList.remove('over');if(e.dataTransfer
 addEventListener('dragover',e=>e.preventDefault());addEventListener('drop',e=>e.preventDefault());
 $('go').onclick=async()=>{ $('msg').textContent='解析中…'; RES=[]; let skip=[];
   try{ for(const f of inp.files){ const wb=XLSX.read(await f.arrayBuffer()); let hit=0;
-      for(const sn of wb.SheetNames){ const r=parseSheet(XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:false,defval:null})); if(r){r.file=f.name; RES.push(r); hit=1;} }
+      for(const sn of wb.SheetNames){ const aoa=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:false,defval:null}), r=parseSheet(aoa)||parseGeneric(aoa); if(r){r.file=f.name; RES.push(r); hit=1;} }
       if(!hit) skip.push(f.name); }
     RES.push(...cross(RES)); render(); $('xl').hidden=!RES.length; $('xl').onclick=exportXlsx;
     $('msg').textContent=skip.length?`未支援的報表：${skip.join('、')}`:'';
