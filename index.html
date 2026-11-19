@@ -11,7 +11,7 @@ nav.tabs{max-width:1100px;margin:auto;padding:20px 16px 0;display:flex;gap:8px}n
 main[hidden]{display:none}
 </style></head><body>
 <header><h1>綜計表勾稽專區</h1></header>
-<nav class="tabs"><a href="#fund">非營業特種基金</a><a href="#soe">國營事業</a></nav>
+<nav class="tabs"><a href="#fund">非營業特種基金</a><a href="#soe">國營事業</a><a href="#trust">信託基金</a></nav>
 <main id="fund">
 <a class="card" href="statements-check.html"><h2>主要表綜計表檢誤</h2><p>上傳主要表 PDF，驗算合計、百分比、比較增減，並做散總勾稽。</p>
 <ul><li>收支餘絀、餘絀撥補、基金來源用途及餘絀、現金流量表</li><li>作業基金、特別收入基金、國立大學校院校務基金</li><li>只傳單位表可自動彙編綜計表</li></ul><span class="go">開始檢誤 →</span></a>
@@ -23,14 +23,17 @@ main[hidden]{display:none}
 <a class="card" href="employees-check.html"><h2>員工人數明細表核對</h2><p>表內勾稽，並與人事總處預算員額分配一覽表逐基金比對。</p><ul><li>專任合計＝各類人數；主管＝所屬基金；甲乙部分與合計</li><li>空白格檢查</li><li>只傳 PDF 時只做表內勾稽</li></ul><span class="go">開始核對 →</span></a>
 <a class="card" href="statements-check.html"><h2>用人費用明細表檢誤</h2><p>表內欄位與列加總勾稽。</p><ul><li>合計＝各項用人費用</li><li>主管＝所屬基金；甲乙部分與合計</li><li>空白格檢查</li></ul><span class="go">開始檢誤 →</span></a>
 <a class="card" href="statements-check.html"><h2>基金數額增減綜計表檢誤</h2><p>表內欄位與列加總勾稽。</p><ul><li>期末＝期初＋增加數－減少數</li><li>主管＝所屬基金、合計＝各主管</li><li>空白格檢查</li></ul><span class="go">開始檢誤 →</span></a>
-<a class="card" href="soe-statements-check.html"><h2>綜計表及預算表 Excel 檢誤</h2><p>直接上傳主計總處公布之 Excel，免 PDF 解析。</p><ul><li>債務基金、資本計畫基金、附錄信託基金主要表</li><li>作業／特別收入基金各預算表、各綜計表</li><li>收支賸餘繳庫綜計表：主管＝所屬基金</li></ul><span class="go">開始檢誤 →</span></a>
+<a class="card" href="soe-statements-check.html"><h2>綜計表及預算表 Excel 檢誤</h2><p>直接上傳主計總處公布之 Excel，免 PDF 解析。</p><ul><li>債務基金、資本計畫基金主要表</li><li>作業／特別收入基金各預算表、各綜計表</li><li>收支賸餘繳庫綜計表：主管＝所屬基金</li></ul><span class="go">開始檢誤 →</span></a>
 <a class="card" href="long-term-debt-cashflow.html"><h2>長期債務與現金流量表勾稽說明</h2><p>長期債務與現金流量表之間的勾稽關係說明。</p><span class="go">閱讀說明 →</span></a>
 <a class="card" href="https://cormort.github.io/univ-cashflow-crosscheck/"><h2>國立大學校院校務基金現金流量表勾稽底稿</h2><p>上傳預計平衡表與現金流量預計表，在瀏覽器裡產生總表＋47 校明細的勾稽底稿，檔案不上傳。</p><span class="go">開啟工具 →</span></a>
 </main>
 <main id="soe" hidden>
 <a class="card" href="soe-statements-check.html"><h2>國營事業綜計表檢誤</h2><p>上傳主計總處公布之國營事業綜計表 Excel／ODS，驗算合計、百分比及比較增減。</p><ul><li>依科目／項目分列、依業別分列、依主管機關別分列</li><li>總計＝各業別（主管）加總</li><li>依業別、依主管機關別總計＝依科目分列本年度</li><li>其餘綜計表、參考表：主管＝所屬事業、小計／合計、%、增減自動驗算</li></ul><span class="go">開始檢誤 →</span></a>
 </main>
+<main id="trust" hidden>
+<a class="card" href="soe-statements-check.html"><h2>信託基金主要表檢誤</h2><p>上傳主計總處公布之附錄信託基金 Excel（收支餘絀表、餘絀撥補表、現金流量表），驗算百分比、比較增減及現金流量。</p><ul><li>% ＝金額÷總收入（或「…之部」）</li><li>比較增減＝本年度－上年度、本期賸餘＝總收入－總支出</li><li>各活動淨現金＝各項加總、期末＝期初＋淨增</li></ul><span class="go">開始檢誤 →</span></a>
+</main>
 <script>/* ponytail: 以 hash 切換分頁 */
-const tab=()=>{const h=location.hash==='#soe'?'soe':'fund';document.querySelectorAll('main').forEach(m=>m.hidden=m.id!==h);document.querySelectorAll('nav.tabs a').forEach(a=>a.classList.toggle('on',a.hash==='#'+h));};
+const tab=()=>{const h=['#soe','#trust'].includes(location.hash)?location.hash.slice(1):'fund';document.querySelectorAll('main').forEach(m=>m.hidden=m.id!==h);document.querySelectorAll('nav.tabs a').forEach(a=>a.classList.toggle('on',a.hash==='#'+h));};
 addEventListener('hashchange',tab);tab();</script>
 </body></html>
