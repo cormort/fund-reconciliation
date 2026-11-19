@@ -110,6 +110,25 @@ function cross(rs){ const out=[];
   if(cap&&sh){ const E=[], last=x=>x.v[x.v.length-1]??[...x.v].reverse().find(v=>v!=null), m=new Map(sh.rows.map(x=>[x.name,last(x)]));
     cap.rows.forEach(x=>{ if(!m.has(x.name)) return; const a=x.v[14]||0, b=m.get(x.name)||0; if(a!==b) E.push({row:x.name,col:'期末實收資本',exp:b,act:a,why:'資本增減綜計表期末實收資本＝資本股額綜計表資本額合計'}); });
     out.push({kind:'資本增減',by:'',rows:[],E,x:'期末實收資本↔資本股額勾稽'}); }
+  /* 國營事業依業別／主管機關別各欄＝所屬公司主要表加總：主管依參考表之主管→公司，業別以公司組合擬合（各欄試遍 2^n 組合，取相符列最多者） */
+  { const cos=fs.filter(r=>r.wt==='營業'), own={};
+    rs.filter(r=>r.x==='通用檢誤'&&r.rows?.some(x=>x.lv===1)).forEach(g=>{ let m=null; g.rows.forEach(x=>{ if(x.lv===1) m=x.name; else if(m&&x.lv%10===2) own[key(x.name)]=m; }); });
+    for(const m of rs.filter(r=>r.zong&&!r.single&&r.k2&&zt(r)==='營業'&&r.rows?.[0]?.cols)){ const fsK=cos.filter(r=>r.k2===m.k2); if(fsK.length<2) continue;
+      const hs=Object.keys(m.rows[0]?.cols||{}).slice(1), E=[], notes=[];
+      const col=h=>V({...m,rows:m.rows.map(x=>({name:x.name,cols:{[h]:x.cols[h]}}))}), fv=fsK.map(f=>{ const v=V(f);
+        for(const k of col(Object.keys(m.rows[0].cols)[0]).keys()){ const mt=k.match(/^([^|]*)\|母公司業主#1$/); if(mt&&!v.has(k)){ const src=[...v.entries()].find(([kk])=>kk.startsWith(mt[1]+'|本期')); if(src) v.set(k,src[1]); } }   /* 無非控制權益之公司：母公司業主＝本期淨利 */
+        return [f.fund,v]; });
+      for(const h of hs){ const cv=col(h), ks=[...cv.keys()], val=(v,k)=>{ const o=v.get(k); return (o?.本年度??o?.決算核定數)||0; };   /* 決算取決算核定數 */
+        let pick=fsK.map((f,i)=>own[key(f.fund)]===h?i:-1).filter(i=>i>=0), how='主管';
+        if(!Object.values(own).includes(h)){   /* 主管清單已列者照清單（該主管各公司可能無此表），否則擬合 */ how='擬合'; let best=null;   /* ponytail: 2^n 窮舉，n＝15 約 3 萬組；公司數大增時改 DP */
+          const M=fv.map(([,v])=>ks.map(k=>val(v,k))), tgt=ks.map(k=>cv.get(k).本年度||0);
+          for(let s=1;s<1<<fv.length;s++){ let bad=0; for(let j=0;j<ks.length&&(!best||bad<best.bad);j++){ let t=0; for(let i=0;i<fv.length;i++) if(s>>i&1) t+=M[i][j]; if(Math.abs(t-tgt[j])>0.5) bad++; }
+            if(!best||bad<best.bad) best={s,bad}; }
+          pick=fv.map((_,i)=>i).filter(i=>best.s>>i&1); }
+        notes.push(`${h}＝${pick.map(i=>fv[i][0].replace(/股份有限公司$/,'')).join('＋')}${how==='擬合'?'（擬合）':''}`);
+        for(const k of ks){ const a=cv.get(k).本年度||0, e=pick.reduce((t,i)=>t+val(fv[i][1],k),0);
+          if(Math.abs(a-e)>0.5) E.push({row:cv.get(k).name,col:h,exp:e,act:a,why:(Math.abs(a-e)<=2&&fsK.some(f=>f.fin)?'尾差（決算 ±2 以內）：':'')+`${h}＝${pick.map(i=>fv[i][0]).join('＋')}${how==='擬合'?'（依其餘列擬合之公司組合）':''}`}); } }
+      out.push({kind:m.kind,by:m.by,rows:[],E,x:'散總',file:`依${m.by}分列各欄＝所屬公司加總：${notes.join('；')}`}); } }
   /* 特別收入基金基金來源、用途及餘絀綜計表（各基金一列）＝各基金主要表 */
   for(const z of rs.filter(r=>r.hd&&/^特別收入基金基金來源/.test(r.kind))){ const E=[]; let n=0;
     const F={基金來源:'基金來源',基金用途:'基金用途','賸餘(短絀)':'本期賸餘'};
