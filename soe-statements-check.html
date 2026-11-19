@@ -22,6 +22,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
 // core-start
 const T=s=>String(s??'').normalize('NFKC').replace(/\s/g,'');
 const N=v=>{ if(v==null||v==='') return null; if(typeof v==='number') return v; let s=T(v); if(s==='-') return 0; if(/^\([\d,.]+\)$/.test(s)) s='-'+s.slice(1,-1);   /* (1,234) 為負數 */ return /^-?[\d,]+(\.\d+)?$/.test(s)?+s.replace(/,/g,''):null; };
+const upToNote=aoa=>{ const i=aoa.findIndex(r=>/^(註|附註|說明)[:：]?/.test(T((r||[]).find(c=>T(c))||''))); return i<0?aoa:aoa.slice(0,i); };   /* 表下註記（含續行）不入表 */
 const r2=x=>Math.round(x*100)/100, isLab=c=>/^(科目|項目)$/.test(T(c));
 /* aoa（列×欄原始值）→ {kind,by,rows:[{name,cols:{欄名:{a,p}}}],E} */
 function parseSheet(aoa){
@@ -36,7 +37,7 @@ function parseSheet(aoa){
   { const hr=aoa.find(r=>r?.some(isLab)); const f=hr&&hr.map(T).find((c,i)=>i>hr.findIndex(isLab)&&c); if(!single&&!/^(合計|總計)$/.test(f||'')) return null; }   /* 首欄非合計（如決算依業務別分頁）交通用檢誤 */   /* 作業／特收依科目分列：版面同單一基金主要表，交 parseStmt */
   { const hi=aoa.findIndex(r=>r?.some(isLab)); if(!single&&(aoa[hi+1]||[]).filter(c=>T(c)&&!/^(金額|%|％)$/.test(T(c))).length>1) return null; }   /* 主管下再分基金之兩層表頭交通用檢誤 */
   let lc=-1, cols=[];
-  for(const r of aoa){
+  for(const r of upToNote(aoa)){
     if(r.some(isLab)){ lc=r.findIndex(isLab);   /* 表頭列（含續頁重複表頭）：重設欄位 */
       cols=single?[]:r.map((c,i)=>[i,T(c)]).filter(([i,c])=>i>lc&&c&&!isLab(c)).map(([i,c])=>({i,h:c})); continue; }
     if(lc<0) continue; const name=T(r[lc]); if(!name) continue;
@@ -147,7 +148,7 @@ function parseStmt(aoa,sheet){
   const fund=title.slice(0,m0.index)+title0.slice(title.length), E=[], f2=x=>Math.round(x*100)/100, key=s=>s.replace(/[（(][^）)]*[）)]/g,'');
   const err=(row,col,exp,act,why)=>E.push({row,col,exp,act:act??'空白',why});
   const hi=aoa.findIndex(r=>r&&/^(項目|科目)(備註)?$/.test(T(r[0]))); if(hi<0) return null;
-  const rowsRaw=aoa.slice(hi+1).filter(r=>r&&T(r[0])&&!/^註/.test(T(r[0])));
+  const rowsRaw=upToNote(aoa.slice(hi+1)).filter(r=>r&&T(r[0]));
   if(kind==='現金流量表'){ if(!aoa[hi].some(c=>/本年度/.test(T(c)))) return null;
     const rows=rowsRaw.map(r=>{ const vs=r.map((c,i)=>[i,N(c)]).filter(([i,v])=>i>0&&v!=null); return {name:T(r[0]),c:vs.length?vs[vs.length-1][0]:-1,v:vs.length?vs[vs.length-1][1]:null}; });
     const leafC=Math.min(...rows.filter(x=>x.v!=null).map(x=>x.c)); let sec=null, tot=[], done=0;
@@ -271,7 +272,7 @@ function parseFinal(aoa){
   const dat=aoa.slice(d), has=c=>dat.some(r=>N(r?.[c])!=null), used=P=>new Set([...Object.values(P.cols),...Object.values(P.pct)]);
   panels.forEach(P=>{ const u=used(P); for(const k in P.cols){ const c=P.cols[k]; if(!has(c)&&has(c+1)&&!u.has(c+1)){ P.cols[k]=c+1; u.add(c+1); } } });   /* 表頭合併儲存格：值落在右一欄 */
   panels.forEach(P=>{ const rs=[]; let prev=null; const vr=Object.values(P.cols).filter(c=>c>P.lc); if(!vr.length) return; const v0=Math.min(...vr);   /* 科目欄右側第一個數值欄 */
-    aoa.slice(d).forEach(r=>{ let nc=P.lc; while(nc<v0&&!T(r?.[nc])) nc++; const name=nc<v0?T(r?.[nc]):'', ind=(nc-P.lc)*100+String(r?.[nc]??'').match(/^\s*/)[0].length;   /* 縮排：欄位或前置空白 */ if(!name||/^註/.test(name)) return; const v={}; for(const [k,c] of Object.entries(P.cols)) v[k]=N(r[c]);
+    upToNote(aoa.slice(d)).forEach(r=>{ let nc=P.lc; while(nc<v0&&!T(r?.[nc])) nc++; const name=nc<v0?T(r?.[nc]):'', ind=(nc-P.lc)*100+String(r?.[nc]??'').match(/^\s*/)[0].length;   /* 縮排：欄位或前置空白 */ if(!name||/^註/.test(name)) return; const v={}; for(const [k,c] of Object.entries(P.cols)) v[k]=N(r[c]);
       if(Object.values(v).every(x=>x==null)){ if(prev&&/[及、之與]$/.test(prev.name)) prev.name+=name; else rs.push(prev={name,v,p:{},ind:null}); return; }
       const p={}; for(const [k,c] of Object.entries(P.pct)) p[k]=N(r[c]); rs.push(prev={name,v,p,ind}); });
     /* 散總：上層科目＝縮排下一層加總 */
