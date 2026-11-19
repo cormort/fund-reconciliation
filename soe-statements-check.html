@@ -1,0 +1,96 @@
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>國營事業綜計表檢誤</title><style>
+:root{--n:#17365d;--b:#2f75b5;--bg:#eef2f6;--line:#d8e0e7;--ink:#26343e;--bad:#f8d0d0}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:"Microsoft JhengHei","Noto Sans TC",sans-serif;line-height:1.6}
+header{background:linear-gradient(135deg,#102a46,#2f75b5);color:#fff;padding:30px 16px}header div,main{max-width:1200px;margin:auto}h1{margin:0 0 6px}header a{color:#cfe3f5}
+main{padding:20px 16px 50px}.card{background:#fff;border:1px solid #e2e8ed;border-radius:14px;padding:20px;margin-bottom:18px}.card h2{color:var(--n);margin:0 0 12px;font-size:1.2rem}
+label.f{display:block;border:2px dashed #9fb1c0;border-radius:10px;padding:14px;cursor:pointer}label.f input{display:block;margin-top:6px;max-width:100%}label.f.over{border-color:var(--b);background:#eaf3f8}label.f small{display:block;color:#667784}
+button{border:0;background:var(--n);color:#fff;padding:9px 16px;border-radius:8px;cursor:pointer;font-weight:700;margin-top:12px}button:disabled{opacity:.5}
+table{width:100%;border-collapse:collapse;font-size:.88rem}th{background:var(--n);color:#fff;padding:6px;border:1px solid rgba(255,255,255,.25)}td{padding:5px 8px;border-bottom:1px solid var(--line)}td.num{text-align:right;white-space:nowrap}
+.small{color:#667784;font-size:.86rem}.wrap{overflow-x:auto}.ok{color:#2e7d32;font-weight:700}.ng{color:#c62828;font-weight:700}
+</style></head><body>
+<header><div><h1>國營事業綜計表檢誤</h1><p>上傳主計總處公布之附屬單位預算（營業部分）綜計表 Excel／ODS，驗算合計、百分比、比較增減，並做綜計表間勾稽。<br><a href="index.html#soe">← 回專區</a></p></div></header>
+<main>
+<section class="card"><h2>上傳 Excel</h2>
+<label class="f">綜計表檔案（.xlsx／.xls／.ods，可多選）<small>拖曳檔案到這裡，或點選選擇</small><input type="file" id="fa" accept=".xlsx,.xls,.ods" multiple></label>
+<button id="go" disabled>開始檢誤</button> <button id="xl" hidden>匯出 Excel</button> <span id="msg" class="small"></span>
+<p class="small">檔案只在瀏覽器內解析，不會上傳。依標題自動判斷：損益、盈虧撥補、現金流量綜計表（依科目／項目分列、依業別分列、依主管機關別分列）。檢查：總計欄＝各業別（主管）欄加總；%＝金額÷基準列（營業收入、盈餘之部、分配之部等 % 為 100 之列），差 0.01 以內視為相符；比較增減 %＝（本年度－上年度）÷上年度；同時上傳時另核依業別、依主管機關別之總計欄＝依科目分列之本年度預算數。檔案來源：<a href="https://www.dgbas.gov.tw/News_Content.aspx?n=3626&s=236566">主計總處 116 年度國營事業預算</a>。</p></section>
+<div id="out"></div></main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+// core-start
+const T=s=>String(s??'').normalize('NFKC').replace(/\s/g,'');
+const N=v=>{ if(v==null||v==='') return null; if(typeof v==='number') return v; const s=T(v); if(s==='-') return 0; return /^-?[\d,]+(\.\d+)?$/.test(s)?+s.replace(/,/g,''):null; };
+const r2=x=>Math.round(x*100)/100, isLab=c=>/^(科目|項目)$/.test(T(c));
+/* aoa（列×欄原始值）→ {kind,by,rows:[{name,cols:{欄名:{a,p}}}],E} */
+function parseSheet(aoa){
+  const title=T(aoa.slice(0,3).flat().join(''));
+  const kind=(title.match(/(損益|盈虧撥補|現金流量)綜計表/)||[])[1], by=(title.match(/依(.+?)分列/)||[])[1];
+  if(!kind||!by) return null;
+  const single=!/業別|主管機關別/.test(by), rows=[], E=[];
+  let lc=-1, cols=[];
+  for(const r of aoa){
+    if(r.some(isLab)){ lc=r.findIndex(isLab);   /* 表頭列（含續頁重複表頭）：重設欄位 */
+      cols=single?[]:r.map((c,i)=>[i,T(c)]).filter(([i,c])=>i>lc&&c&&!isLab(c)).map(([i,c])=>({i,h:c})); continue; }
+    if(lc<0) continue; const name=T(r[lc]); if(!name) continue;
+    const row={name,cols:{}};
+    if(single){ const g=i=>N(r[i]);
+      if(kind==='現金流量') row.cols['本年度']={a:g(lc+1)??g(lc+2)};
+      else { row.cols['前年度決算']={a:g(lc-2),p:r[lc-1]}; row.cols['本年度']={a:g(lc+1),p:r[lc+2]}; row.cols['上年度']={a:g(lc+3),p:r[lc+4]}; row.chg=r[lc+5]; }
+    } else cols.forEach(({i,h})=>row.cols[h]={a:N(r[i]),p:kind==='現金流量'?undefined:r[i+1]});
+    rows.push(row);
+  }
+  const res={kind,by,single,rows,E}, err=(row,col,exp,act,why)=>E.push({row:row.name,col,exp,act,why});
+  /* 總計＝各欄加總 */
+  if(!single) rows.forEach(row=>{ const ks=Object.keys(row.cols); if(!ks.length) return; const [t,...o]=ks, s=o.reduce((x,k)=>x+(row.cols[k].a||0),0);
+    if((row.cols[t].a||0)!==s) err(row,t,s,row.cols[t].a,'總計＝'+o.join('＋')); });
+  /* %＝金額÷基準列（% 為 100 之列） */
+  if(kind!=='現金流量'){ const base={};
+    rows.forEach(row=>{ for(const [k,c] of Object.entries(row.cols)){
+      if(T(c.p)==='100'&&c.a){ base[k]=c.a; continue; }
+      if(c.p===undefined||!base[k]) continue; const exp=r2((c.a||0)/base[k]*100), p=N(c.p);
+      if(p!=null&&Math.abs(exp-p)>0.0100001)   /* ponytail: 空白 % 不報（淨利歸屬列慣例無 %） */ err(row,k+' %',exp,c.p,`%＝${c.a||0}÷${base[k]}`); } }); }
+  /* 比較增減 % */
+  if(single&&kind!=='現金流量') rows.forEach(row=>{ const a=row.cols['本年度'].a, b=row.cols['上年度'].a, p=N(row.chg); if(!b) return;
+    const exp=r2(((a||0)-b)/Math.abs(b)*100);
+    if(p!=null&&Math.abs(exp-p)>0.0100001) err(row,'比較增減 %',exp,row.chg??'空白','（本年度－上年度）÷上年度'); });
+  return res;
+}
+/* 依業別、依主管機關別之總計欄＝依科目分列之本年度（同名科目依出現順序對齊） */
+function cross(rs){ const out=[];
+  for(const kind of ['損益','盈虧撥補','現金流量']){ const s=rs.find(r=>r.kind===kind&&r.single); if(!s) continue;
+    const key=r=>{const n={}; return new Map(r.rows.map(x=>{n[x.name]=(n[x.name]||0)+1; return [x.name+'#'+n[x.name],x];}));}, sm=key(s);
+    rs.filter(r=>r.kind===kind&&!r.single).forEach(m=>{ const E=[];
+      for(const [k,x] of key(m)){ const t=Object.values(x.cols)[0]?.a||0, y=sm.get(k), v=y?y.cols['本年度'].a||0:null;
+        if(v!==t) E.push({row:x.name,col:'總計',exp:v??'（依科目分列無此列）',act:t,why:`依${m.by}分列總計＝依${s.by}分列本年度`}); }
+      out.push({kind,by:m.by,rows:[],E,x:`依${m.by}分列↔依${s.by}分列勾稽`}); }); }
+  return out;
+}
+// core-end
+const nm=r=>`${r.kind}綜計表（${r.x||'依'+r.by+'分列'}）`;
+const $=id=>document.getElementById(id), esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])), fmt=n=>typeof n==='number'?n.toLocaleString('en-US',{maximumFractionDigits:2}):n;
+let RES=[];
+function render(){ const n=RES.reduce((s,r)=>s+r.E.length,0);
+  let h=`<section class="card"><h2>檢誤摘要</h2><p>共 ${RES.length} 項；錯誤 <span class="ng">${n}</span>。</p><div class="wrap"><table><tr><th>檔案</th><th>報表</th><th>結果</th></tr>`;
+  RES.forEach(r=>h+=`<tr><td>${esc(r.file||'')}</td><td>${esc(nm(r))}</td><td>${r.E.length?`<span class="ng">錯誤 ${r.E.length}</span>`:'<span class="ok">通過</span>'}</td></tr>`);
+  h+='</table></div></section>';
+  RES.filter(r=>r.E.length).forEach(r=>{ h+=`<section class="card"><h2>${esc(nm(r))}</h2><div class="wrap"><table><tr><th>項目</th><th>欄位</th><th>應為</th><th>實為</th><th>驗算</th></tr>`;
+    r.E.forEach(e=>h+=`<tr><td>${esc(e.row)}</td><td>${esc(e.col)}</td><td class="num">${esc(fmt(e.exp))}</td><td class="num ng">${esc(fmt(e.act))}</td><td>${esc(e.why)}</td></tr>`);
+    h+='</table></div></section>'; });
+  $('out').innerHTML=h;
+}
+function exportXlsx(){ const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['檔案','報表','項目','欄位','應為','實為','驗算'],...RES.flatMap(r=>r.E.map(e=>[r.file||'',nm(r),e.row,e.col,e.exp,e.act,e.why]))]),'檢誤結果');
+  XLSX.writeFile(wb,'國營事業綜計表檢誤.xlsx'); }
+const inp=$('fa'), lab=inp.closest('label'), ready=()=>$('go').disabled=!inp.files.length;
+inp.onchange=ready;
+lab.ondragover=e=>{e.preventDefault();lab.classList.add('over');}; lab.ondragleave=()=>lab.classList.remove('over');
+lab.ondrop=e=>{e.preventDefault();lab.classList.remove('over');if(e.dataTransfer.files.length){inp.files=e.dataTransfer.files;ready();}};
+addEventListener('dragover',e=>e.preventDefault());addEventListener('drop',e=>e.preventDefault());
+$('go').onclick=async()=>{ $('msg').textContent='解析中…'; RES=[]; let skip=[];
+  try{ for(const f of inp.files){ const wb=XLSX.read(await f.arrayBuffer()); let hit=0;
+      for(const sn of wb.SheetNames){ const r=parseSheet(XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:false,defval:null})); if(r){r.file=f.name; RES.push(r); hit=1;} }
+      if(!hit) skip.push(f.name); }
+    RES.push(...cross(RES)); render(); $('xl').hidden=!RES.length; $('xl').onclick=exportXlsx;
+    $('msg').textContent=skip.length?`未支援的報表：${skip.join('、')}`:'';
+  }catch(e){ $('msg').textContent='解析失敗：'+e.message; console.error(e); } };
+</script></body></html>
