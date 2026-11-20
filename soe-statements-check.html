@@ -1,4 +1,4 @@
-<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>綜計表及預算表 Excel 檢誤</title><style>
+<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>綜計表及預算表檢誤</title><style>
 :root{--n:#17365d;--b:#2f75b5;--bg:#eef2f6;--line:#d8e0e7;--ink:#26343e;--bad:#f8d0d0}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:"Microsoft JhengHei","Noto Sans TC",sans-serif;line-height:1.6}
 header{background:linear-gradient(135deg,#102a46,#2f75b5);color:#fff;padding:30px 16px}header div,main{max-width:1200px;margin:auto}h1{margin:0 0 6px}header a{color:#cfe3f5}
@@ -7,13 +7,36 @@ label.f{display:block;border:2px dashed #9fb1c0;border-radius:10px;padding:14px;
 button{border:0;background:var(--n);color:#fff;padding:9px 16px;border-radius:8px;cursor:pointer;font-weight:700;margin-top:12px}button:disabled{opacity:.5}
 table{width:100%;border-collapse:collapse;font-size:.88rem}th{background:var(--n);color:#fff;padding:6px;border:1px solid rgba(255,255,255,.25)}td{padding:5px 8px;border-bottom:1px solid var(--line)}td.num{text-align:right;white-space:nowrap}
 .small{color:#667784;font-size:.86rem}.wrap{overflow-x:auto}.ok{color:#2e7d32;font-weight:700}.ng{color:#c62828;font-weight:700}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px;margin-bottom:14px}.tile{background:#f5f8fb;border:1px solid var(--line);border-radius:10px;padding:6px 10px}.tile b{display:block;font-size:1.25rem;color:var(--n)}.tile.bad b{color:#c62828}.tile span{font-size:.82rem;color:#667784}
+nav.tabs{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 12px}nav.tabs button{margin:0;border:1px solid var(--line);background:#fff;color:var(--n);border-radius:999px;padding:5px 12px;font-weight:600}nav.tabs button.on{background:var(--n);color:#fff;border-color:var(--n)}nav.tabs .cnt{opacity:.75;font-weight:400}nav.tabs .er{color:#c62828}nav.tabs button.on .er{color:#ffcdd2}
+.opts{display:flex;flex-wrap:wrap;gap:14px;font-size:.88rem;color:#4b5b67;margin-bottom:8px}.opts label{cursor:pointer}
+details.rep{border-top:1px solid var(--line)}details.rep>summary{list-style:none;display:flex;gap:10px;align-items:center;padding:9px 4px;cursor:pointer}details.rep>summary::-webkit-details-marker{display:none}
+details.rep>summary::before{content:'▸';color:#9fb1c0;width:1em}details.rep[open]>summary::before{content:'▾'}details.rep>summary .nm{flex:1;min-width:0}details.rep>summary .fl{color:#8a99a5;font-size:.8rem;display:block}
+.pill{border-radius:999px;padding:1px 9px;font-size:.8rem;white-space:nowrap}.pill.ok{background:#e3f2e5;color:#2e7d32}.pill.ng{background:#fde4e4;color:#c62828}.pill.t{background:#fff4d6;color:#8a6d00}
+details.rep .body{padding:4px 0 12px 1.6em}tr.tail td{color:#8a99a5}.hideTail tr.tail{display:none}
+details.help{margin-top:12px;font-size:.88rem;color:#4b5b67}details.help summary{cursor:pointer;color:var(--b);font-weight:600}details.help h4{margin:12px 0 4px;color:var(--n)}details.help ul{margin:0;padding-left:1.3em}
 </style></head><body>
-<header><div><h1>綜計表及預算表 Excel 檢誤</h1><p>上傳主計總處公布之國營事業、非營業特種基金綜計表及預算表 Excel／ODS，驗算合計、百分比、比較增減，並做綜計表間勾稽。<br><a href="index.html">← 回專區</a></p></div></header>
+<header><div><h1>綜計表及預算表檢誤</h1><p>國營事業、非營業特種基金、信託基金之綜計表、預算表、決算、審核摘要表與彙總表；驗算合計、百分比、比較增減，並做表間勾稽與散總。<br><a href="index.html">← 回專區</a></p></div></header>
 <main>
-<section class="card"><h2>上傳 Excel</h2>
-<label class="f">綜計表、預算表、決算檔案（.xlsx／.xls／.ods，國營事業及信託基金另可上傳 PDF；可多選）<small>拖曳檔案到這裡，或點選選擇</small><input type="file" id="fa" accept=".xlsx,.xls,.ods,.pdf" multiple></label>
+<section class="card"><h2>上傳檔案</h2>
+<label class="f">Excel／ODS（.xlsx、.xls、.ods）或 PDF，可一次多選；同類報表一起上傳才能做散總<small>拖曳檔案到這裡，或點選選擇</small><input type="file" id="fa" accept=".xlsx,.xls,.ods,.pdf" multiple></label>
 <button id="go" disabled>開始檢誤</button> <button id="xl" hidden>匯出 Excel</button> <span id="msg" class="small"></span>
-<p class="small">檔案只在瀏覽器內解析，不會上傳。非營業特種基金：作業基金、特別收入基金、債務基金、資本計畫基金預算表及附錄信託基金之收支餘絀表、餘絀撥補表、基金來源用途及餘絀表（散總：上層科目＝縮排下一層科目加總；% ＝金額÷首列或「…之部」100% 列、比較增減＝本年度－上年度、本期賸餘＝總收入－總支出／基金來源－基金用途／業務賸餘＋業務外賸餘、期末基金餘額＝期初＋本期賸餘－解繳公庫）、現金流量表（各活動淨現金＝該活動各項加總、未計利息股利列＝累計、淨增＝各活動加總、期末＝期初＋淨增）；各綜計表、收支賸餘繳庫綜計表等參考表用下述通用檢誤。<br><b>決算</b>（查核表、決算綜計表，主計總處 113 年度起之 Excel）：依表頭定位上年度決算數／預算數／原列決算數／修正數／決算核定數／比較增減；決算核定數＝原列決算數＋修正數、比較增減＝決算核定數－預算數（平衡表：本年度－上年度）、% 驗算、上層科目＝下層加總、現金流量各活動及淨增、各單位原列（核定）數合計＝各單位加總；散總同預算。決算以元計，差 2 元以內列尾差。<br><b>預算審核摘要表</b>（作業基金、政事基金）：表內驗算 116年度核列數＝主管機關核列數＋審議增減數＋待協商數、上層項目＝下層加總（轉投資＝增加投資－收回投資；長期債務不檢）、本期賸餘＝收入－支出（政事基金另核期末基金餘額＝期初＋本期賸餘－解繳國庫）；同批上傳該基金預算表（Excel 或 PDF）時，核列數、115年度預算數、114年度決算數分別對預算表本年度、上年度、前年度決算之同名項目。名稱含「供參」之工作表略過。<br><b>彙總表</b>（自編之國營事業各公司並列表：財務摘要、損益、盈虧撥補、現金流量、資產負債，含合計及業別／主管欄）：與同批上傳之各公司主要表（PDF 或 Excel）逐公司逐科目核對（116預算＝本年度、115預算＝上年度、114決算＝前年度決算；財務摘要對各公司財務摘要頁），並驗算合計＝各公司加總、業別／主管欄＝所屬公司加總。<br><b>自動彙編</b>：只上傳國營事業各公司損益表、盈虧撥補表、現金流量表（Excel 或 PDF）而未附綜計表時，自動加總為綜計表（依科目分列含本年度、上年度、前年度決算及 %、比較增減；依業別、依主管機關別分列），可匯出 Excel。業別、主管對照預設為 116 年度綜計表之歸屬，同批上傳含主管清單之參考表時以其為準。以 116 年度 15 家公司彙編結果與主計總處綜計表逐值比對相同（前年度決算僅差 1、2 千元尾差）。<br><b>PDF</b>：國營事業綜計表（依科目／項目分列）、各公司損益表、盈虧撥補表、現金流量表，作業基金、特別收入基金、債務基金、資本計畫基金各基金主要表（收支餘絀表、餘絀撥補表、基金來源用途及餘絀表、現金流量表）及信託基金主要表可直接上傳 PDF（以主計總處 116 年度 113 個 PDF 與 Excel 逐值比對，244 張主要表數值相同；少數跨行之長計畫名稱可能截斷，不影響檢核）；依業別、主管機關別等多欄綜計表及參考表請上傳 Excel。<br><b>散總</b>（同批上傳綜計表與各基金／事業預算表時）：作業基金、特別收入基金、國營事業之綜計表依科目／項目分列＝同類各基金（事業）主要表同科目加總（本年度、上年度、前年度決算）；依基金別分列各欄、特別收入基金基金來源用途及餘絀綜計表各基金列＝該基金主要表。須上傳該類全部基金才會相符，結果標示加總基金數。國營事業各公司損益表、盈虧撥補表與綜計表同版面，一併檢核 %、比較增減。<br>國營事業：依標題自動判斷：損益、盈虧撥補、現金流量綜計表（依科目／項目分列、依業別分列、依主管機關別分列）。檢查：總計欄＝各業別（主管）欄加總；%＝金額÷基準列（營業收入、盈餘之部、分配之部等 % 為 100 之列），差 0.01 以內視為相符；比較增減 %＝（本年度－上年度）÷上年度；同時上傳時另核依業別、依主管機關別之總計欄＝依科目分列之本年度預算數。其餘綜計表及參考表（財務摘要、營業利益、淨利、繳庫盈餘、固定資產、資產變賣、長期債務、轉投資、資本增減、成本效益分析、資本股額、員工人數、用人費用、稅捐規費）用通用檢誤：總計＝各主管、主管＝所屬事業、上層計畫＝所屬計畫、國內＋國外部分；小計／合計欄＝左側各欄；% 及增減欄自動找出公式（如 金額÷合計、（本年度－上年度）÷上年度）後逐列驗算，空白格不報。決算數差 2 以內標「尾差」。專屬檢查：資本增減綜計表 合計現金＝各政府現金、合計轉帳＝各政府轉帳、期末合計＝期初合計＋現金＋轉帳，並勾稽期末實收資本＝資本股額綜計表資本額合計；繳納各項稅捐與規費綜計表 合計區各稅目＝中央＋地方＋外國同稅目、總計＝各稅目＝各小計、規費＝各規費。檔案來源：<a href="https://www.dgbas.gov.tw/News_Content.aspx?n=3626&s=236566">主計總處 116 年度國營事業預算</a>。</p></section>
+<p class="small">檔案只在瀏覽器內解析，不會上傳。依標題自動判斷報表種類。</p>
+<details class="help"><summary>支援的報表與檢查項目</summary>
+<h4>國營事業</h4><ul>
+<li>綜計表（依科目／業別／主管機關別分列）、各公司損益表、盈虧撥補表、現金流量表：合計、%、比較增減、依業別／主管各欄＝所屬公司</li>
+<li>參考表（固定資產、資產變賣、長期債務、轉投資、資本增減、資本股額、員工人數、用人費用、稅捐規費等）：主管＝所屬事業、小計／合計、% 與增減</li>
+<li>散總：綜計表＝15 家公司主要表加總；只傳各公司主要表時<b>自動彙編</b>綜計表（可匯出）</li>
+<li>彙總表（自編並列表）：各公司欄對公司主要表、合計與業別／主管欄</li></ul>
+<h4>非營業特種基金</h4><ul>
+<li>作業、特別收入、債務、資本計畫基金預算表：上層科目＝下層加總、%、比較增減、本期賸餘、期末基金餘額、現金流量</li>
+<li>各綜計表與參考表（含收支賸餘繳庫）；散總：綜計表＝各基金預算表加總</li>
+<li>預算審核摘要表：核列數＝主管核列＋審議增減＋待協商、上層＝下層加總，並對各基金預算表</li></ul>
+<h4>信託基金</h4><ul><li>收支餘絀表、餘絀撥補表、現金流量表（無綜計表，各表自行驗算）</li></ul>
+<h4>決算</h4><ul><li>查核表、決算綜計表：決算核定數＝原列＋修正、比較增減、%、散總</li></ul>
+<h4>PDF</h4><ul><li>國營事業綜計表（依科目）、各公司及各基金主要表、信託基金可上傳 PDF；依業別／主管多欄綜計表與參考表請用 Excel</li></ul>
+<h4>尾差</h4><ul><li>決算數差 2 以內、百分比差 0.01 以內、億元摘要差 0.08 以內列「尾差」，不計入錯誤</li></ul>
+</details></section>
 <div id="out"></div></main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -472,24 +495,41 @@ function parseBook(sheets,names=[]){ const rs=sheets.map((a,si)=>{ const r=parse
     return r; }).filter(Boolean);
   const own=rs.filter(r=>!r.zong&&r.k2);
   const t=own.some(r=>/損益|盈虧撥補/.test(r.kind))?'營業':own.some(r=>r.k2==='IS'&&r.rows.some(x=>key(x.name)==='業務收入'))?'作業':own.some(r=>r.k2==='SF'&&!/債務基金|營舍/.test(r.fund))?'特收':'';
-  own.forEach(r=>r.wt=t); return rs; }
+  own.forEach(r=>r.wt=t);
+  const trust=own.some(r=>r.k2==='IS'&&r.rows.some(x=>key(x.name)==='總收入'))&&!own.some(r=>r.rows.some(x=>key(x.name)==='業務收入'));
+  const soe=t==='營業'||rs.some(r=>zt(r)==='營業'||r.rows?.some(x=>/(股份有限公司|銀行|印刷廠)$/.test(x.name)));
+  rs.forEach(r=>r.cat=r.rv?'審核摘要表':r.hz?'彙總表':soe?'國營事業':trust?'信託基金':'非營業特種基金');   /* 結果分頁用 */
+  return rs; }
 // core-end
 const nm=r=>r.x==='通用檢誤'||/^(彙總表|預算審核摘要表)/.test(r.kind)?r.kind:r.single&&!r.zong&&r.fund?`${r.fund}${r.kind}表`:`${r.kind.replace(/綜計表$/,'')}綜計表（${r.x||'依'+r.by+'分列'}）`;
 const $=id=>document.getElementById(id), esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])), fmt=n=>typeof n==='number'?n.toLocaleString('en-US',{maximumFractionDigits:2}):n;
 let RES=[];
 const isT=e=>/^尾差/.test(e.why), ne=r=>r.E.filter(e=>!isT(e)).length;
-function render(){ const n=RES.reduce((s,r)=>s+ne(r),0), t=RES.reduce((s,r)=>s+r.E.length-ne(r),0);
-  let h=`<section class="card"><h2>檢誤摘要</h2><p>共 ${RES.length} 項；錯誤 <span class="ng">${n}</span>、尾差 ${t}。</p><div class="wrap"><table><tr><th>檔案</th><th>報表</th><th>結果</th></tr>`;
-  RES.forEach(r=>h+=`<tr><td>${esc(r.file||'')}</td><td>${esc(nm(r))}</td><td>${ne(r)?`<span class="ng">錯誤 ${ne(r)}</span>`:'<span class="ok">通過</span>'}${r.E.length-ne(r)?`（尾差 ${r.E.length-ne(r)}）`:''}</td></tr>`);
-  h+='</table></div></section>';
-  RES.filter(r=>r.E.length).forEach(r=>{ h+=`<section class="card"><h2>${esc(nm(r))}</h2><div class="wrap"><table><tr><th>項目</th><th>欄位</th><th>應為</th><th>實為</th><th>驗算</th></tr>`;
-    r.E.forEach(e=>h+=`<tr><td>${esc(e.row)}</td><td>${esc(e.col)}</td><td class="num">${esc(fmt(e.exp))}</td><td class="num${isT(e)?"":" ng"}">${esc(fmt(e.act))}</td><td>${esc(e.why)}</td></tr>`);
-    h+='</table></div></section>'; });
-  RES.filter(r=>r.built).forEach(r=>{ const B=r.built, pc=!!B.rows[0]?.p;
-    h+=`<section class="card"><h2>${esc(r.kind)}（${r.by==='科目'?'依科目分列':'依'+esc(r.by)+'分列'}）— 自動彙編</h2><p class="small">${esc(r.x)}</p><div class="wrap"><table><tr><th>科目</th>${B.cs.map(c=>`<th>${esc(c)}</th>${pc?'<th>%</th>':''}`).join('')}${B.chg?'<th>比較增減 %</th>':''}</tr>`;
-    B.rows.forEach(x=>h+=`<tr><td>${esc(x.name)}</td>${B.cs.map(c=>`<td class="num">${fmt(x.v[c])}</td>${pc?`<td class="num">${x.p[c]??''}</td>`:''}`).join('')}${B.chg?`<td class="num">${x.chg??''}</td>`:''}</tr>`);
-    h+='</table></div></section>'; });
-  $('out').innerHTML=h;
+const CATS=['國營事業','非營業特種基金','信託基金','審核摘要表','彙總表','勾稽／散總','自動彙編'];
+const catOf=r=>r.built?'自動彙編':/^(預算審核摘要表↔|彙總表↔)/.test(r.kind)||r.x==='散總'||/勾稽/.test(r.x||'')?'勾稽／散總':r.cat||'非營業特種基金';
+let VIEW={tab:null,onlyBad:false,tail:false};
+function render(){ const n=RES.reduce((s,r)=>s+ne(r),0), t=RES.reduce((s,r)=>s+r.E.length-ne(r),0), rep=RES.filter(r=>!r.built), bad=rep.filter(r=>ne(r)).length;
+  const by={}; RES.forEach(r=>(by[catOf(r)]=by[catOf(r)]||[]).push(r)); const tabs=CATS.filter(c=>by[c]);
+  if(!tabs.includes(VIEW.tab)) VIEW.tab=tabs.find(c=>by[c].some(r=>ne(r)))||tabs[0];
+  let h=`<section class="card"><h2>檢誤結果</h2><div class="tiles"><div class="tile"><b>${rep.length}</b><span>報表／勾稽</span></div><div class="tile ${bad?'bad':''}"><b>${bad}</b><span>有錯誤</span></div><div class="tile ${n?'bad':''}"><b>${n}</b><span>錯誤筆數</span></div><div class="tile"><b>${t}</b><span>尾差筆數</span></div><div class="tile"><b>${rep.length-bad}</b><span>通過</span></div></div>`;
+  h+=`<nav class="tabs">${tabs.map(c=>{ const e=by[c].filter(r=>ne(r)).length; return `<button data-tab="${c}" class="${c===VIEW.tab?'on':''}">${c} <span class="cnt">${by[c].length}</span>${e?` <span class="er">● ${e}</span>`:''}</button>`; }).join('')}</nav>`;
+  h+=`<div class="opts"><label><input type="checkbox" id="onlyBad" ${VIEW.onlyBad?'checked':''}> 只看有錯誤</label><label><input type="checkbox" id="showTail" ${VIEW.tail?'checked':''}> 顯示尾差</label></div><div class="${VIEW.tail?'':'hideTail'}">`;
+  const list=(by[VIEW.tab]||[]).filter(r=>!VIEW.onlyBad||ne(r)).sort((a,b)=>ne(b)-ne(a));
+  if(!list.length) h+='<p class="small">本分頁沒有符合條件的報表。</p>';
+  list.forEach(r=>{ const e=ne(r), tl=r.E.length-e, title=r.built?`${r.kind}（${r.by==='科目'?'依科目分列':'依'+r.by+'分列'}）`:nm(r);
+    h+=`<details class="rep"${e&&list.length<=6?' open':''}><summary><span class="nm">${esc(title)}<span class="fl">${esc(r.built?r.x:(r.file||''))}</span></span>${e?`<span class="pill ng">錯誤 ${e}</span>`:r.built?'<span class="pill ok">彙編</span>':'<span class="pill ok">通過</span>'}${tl?`<span class="pill t">尾差 ${tl}</span>`:''}</summary><div class="body">`;
+    if(r.built){ const B=r.built, pc=!!B.rows[0]?.p;
+      h+=`<div class="wrap"><table><tr><th>科目</th>${B.cs.map(c=>`<th>${esc(c)}</th>${pc?'<th>%</th>':''}`).join('')}${B.chg?'<th>比較增減 %</th>':''}</tr>`;
+      B.rows.forEach(x=>h+=`<tr><td>${esc(x.name)}</td>${B.cs.map(c=>`<td class="num">${fmt(x.v[c])}</td>${pc?`<td class="num">${x.p[c]??''}</td>`:''}`).join('')}${B.chg?`<td class="num">${x.chg??''}</td>`:''}</tr>`);
+      h+='</table></div>'; }
+    else if(r.E.length){ h+=`<div class="wrap"><table><tr><th>項目</th><th>欄位</th><th>應為</th><th>實為</th><th>驗算</th></tr>`;
+      [...r.E].sort((a,b)=>isT(a)-isT(b)).forEach(x=>h+=`<tr class="${isT(x)?'tail':''}"><td>${esc(x.row)}</td><td>${esc(x.col)}</td><td class="num">${esc(fmt(x.exp))}</td><td class="num${isT(x)?'':' ng'}">${esc(fmt(x.act))}</td><td>${esc(x.why.replace(/^尾差（[^）]*）：/,''))}${isT(x)?' <span class="pill t">尾差</span>':''}</td></tr>`);
+      h+='</table></div>'; if(!e&&!VIEW.tail) h+='<p class="small">僅有尾差；勾選「顯示尾差」查看。</p>'; }
+    else h+='<p class="small ok">全部驗算相符。</p>';
+    h+='</div></details>'; });
+  h+='</div></section>'; $('out').innerHTML=h;
+  $('out').querySelectorAll('nav.tabs button').forEach(b=>b.onclick=()=>{ VIEW.tab=b.dataset.tab; render(); });
+  $('onlyBad').onchange=e=>{ VIEW.onlyBad=e.target.checked; render(); }; $('showTail').onchange=e=>{ VIEW.tail=e.target.checked; render(); };
 }
 function exportXlsx(){ const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['檔案','報表','項目','欄位','應為','實為','驗算'],...RES.flatMap(r=>r.E.map(e=>[r.file||'',nm(r),e.row,e.col,e.exp,e.act,e.why]))]),'檢誤結果');
