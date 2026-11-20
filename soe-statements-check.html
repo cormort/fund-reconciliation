@@ -237,7 +237,8 @@ function parseGeneric(aoa){
   const numC=[...Array(W)].map((_,c)=>c).filter(c=>rows.some(x=>x.v[c]!=null));
   const isPct=c=>/%|％|率|\(元\)|年限|每股|期間|起$|止$/.test(hd[c])||!hd[c]&&rows.every(x=>x.v[c]==null||Math.abs(x.v[c])<=100.01)||rows.every(x=>x.v[c]==null||Math.abs(x.v[c])<=1000)&&rows.some(x=>x.v[c]!=null&&!Number.isInteger(x.v[c]));
   const pctC=numC.filter(isPct), amtC=numC.filter(c=>!isPct(c)), E=[], lab=c=>`${colN(c)}欄${hd[c]?' '+hd[c]:''}`;
-  const err=(x,c,exp,why)=>E.push({row:x.name,col:lab(c),exp,act:x.v[c]??'空白',why:(Math.abs(z(x.v[c])-exp)<=2&&/決算/.test(hd[c])?'尾差（決算數 ±2 以內）：':'')+why}), z=v=>v||0;
+  { let m='',co=''; rows.forEach(x=>{ const rk=x.lv%10; if(x.lv===1){ m=x.name; co=''; } else if(rk===2){ co=x.name; } x.org=x.lv===0?'':x.lv===1?x.name:co||m; }); }   /* 所屬：事業／基金（主管列為主管） */
+  const err=(x,c,exp,why)=>E.push({org:x.org,row:x.name,col:lab(c),exp,act:x.v[c]??'空白',why:(Math.abs(z(x.v[c])-exp)<=2&&/決算/.test(hd[c])?'尾差（決算數 ±2 以內）：':'')+why}), z=v=>v||0;
   /* 層級：總計＝各主管、主管＝所屬事業；縮排表／國內外部分：上層＝直屬下層 */
   rows.forEach((p,i)=>{ const ch=[]; for(let j=i+1;j<rows.length&&rows[j].lv>p.lv;j++) ch.push(rows[j]); if(!ch.length) return;
     const m=Math.min(...ch.map(x=>x.lv)), dc=ch.filter(x=>x.lv===m);
@@ -447,12 +448,12 @@ function crossHz(rs){ const out=[];
       if(k2==='FS'){ const f=rs.find(r=>/財務摘要/.test(r.kind)&&r.rows?.length&&short(r.kind.replace(/財務摘要.*$/,''))===short(c.name)); if(!f) continue; n++;
         const fc=[...new Set(f.rows.flatMap(x=>x.v.map((v,i)=>v!=null?i:-1)).filter(i=>i>=0))].sort((a,b)=>a-b), fm=new Map(f.rows.map(x=>[key(x.name),fc.map(i=>x.v[i])]));   /* 依欄位置對應，空格不位移 */
         rows.forEach(x=>{ const y=fm.get(key(x.name)); if(!y) return; for(let j=0;j<Math.min(width,3);j++){ const a=x.vals[ci][j], e=y[j]; if(e==null) continue;   /* 主要表留白（如正負易位不列增減）不比 */
-          if(Math.abs((a||0)-(e||0))>0.006) E.push({row:x.name,col:`${c.h} ${sub[c.i+j]||''}`,exp:e??'空白',act:a??'空白',why:`彙總表＝${c.name}財務摘要`}); } }); continue; }
+          if(Math.abs((a||0)-(e||0))>0.006) E.push({org:c.name,row:x.name,col:`${c.h} ${sub[c.i+j]||''}`,exp:e??'空白',act:a??'空白',why:`彙總表＝${c.name}財務摘要`}); } }); continue; }
       const f=rs.find(r=>r.wt==='營業'&&!r.zong&&r.k2===k2&&short(r.fund)===short(c.name)); if(!f) continue; n++;
       const fv=V(f), zv=V({fin:1,k2,rows:rows.map(x=>({name:x.name,v:{[per]:x.vals[ci][0]}}))});
       for(const k of zv.keys()){ const mt=k.match(/^([^|]*)\|母公司業主#1$/); if(mt&&!fv.has(k)){ const src=[...fv.entries()].find(([kk])=>kk.startsWith(mt[1]+'|本期')); if(src) fv.set(k,src[1]); } }   /* 無非控制權益之公司：母公司業主＝本期淨利 */
       for(const [k,o] of zv){ const a=o[per], y=fv.get(k), e=y?.[per]; if(a==null&&e==null) continue; if(!y&&!a) continue;
-        const dd=Math.abs((a||0)-(e||0)); if(dd>0.5) E.push({row:o.name,col:`${c.h} ${per}`,exp:y?(e??'空白'):'（主要表無此科目）',act:a??'空白',why:(dd<=2&&per==='前年度決算'?'尾差（決算數 ±2 以內）：':'')+`彙總表＝${c.name}主要表`}); } }
+        const dd=Math.abs((a||0)-(e||0)); if(dd>0.5) E.push({org:c.name,row:o.name,col:`${c.h} ${per}`,exp:y?(e??'空白'):'（主要表無此科目）',act:a??'空白',why:(dd<=2&&per==='前年度決算'?'尾差（決算數 ±2 以內）：':'')+`彙總表＝${c.name}主要表`}); } }
     if(n) out.push({kind:z.kind.replace(/^彙總表/,'彙總表↔主要表'),by:'',rows:[],E,x:'散總',file:`${z.kind}：${n} 家公司核對`}); }
   return out; }
 /* 非營業特種基金「預算審核摘要表」（作業基金、政事基金）：表內勾稽＋與該基金預算表核對 */
@@ -486,7 +487,7 @@ function crossReview(rs){ const out=[];
     const E=[], P=[['本年度',7],['上年度',1],['前年度決算',0]]; let n=0;
     rows.forEach(x=>{ if(!x.lv) return; const b=x.base in AL?AL[x.base]:x.base; if(!b) return; const o=look.get(b); if(!o) return; n++;
       for(const [per,j] of P){ if(!(per in o)) continue; const a=x.v[j], e=o[per]; if(a==null&&e==null) continue; const ab=/待填補之短絀/.test(x.base), dd=ab?Math.abs(Math.abs(a||0)-Math.abs(e||0)):Math.abs((a||0)-(e||0));   /* 待填補短絀摘要表列負數、預算表列正數 */
-        if(dd>0.5) E.push({row:x.name,col:RVC[j],exp:e??'空白',act:a??'空白',why:(dd<=2&&j===0?'尾差（決算數 ±2 以內）：':'')+`審核摘要表＝${fund}預算表${per==='本年度'?'本年度預算數':per==='上年度'?'上年度預算數':'前年度決算數'}`}); } });
+        if(dd>0.5) E.push({org:fund,row:x.name,col:RVC[j],exp:e??'空白',act:a??'空白',why:(dd<=2&&j===0?'尾差（決算數 ±2 以內）：':'')+`審核摘要表＝${fund}預算表${per==='本年度'?'本年度預算數':per==='上年度'?'上年度預算數':'前年度決算數'}`}); } });
     out.push({kind:`預算審核摘要表↔預算表 ${fund}（${z.file}）`,by:'',rows:[],E,x:'散總',file:`${fund}：${n} 個項目核對`}); }
   return out; }
 /* 一個活頁簿（一個檔案）→ 各表結果；單一基金／公司主要表標記類別 wt 供散總 */
@@ -522,8 +523,9 @@ function render(){ const n=RES.reduce((s,r)=>s+ne(r),0), t=RES.reduce((s,r)=>s+r
       h+=`<div class="wrap"><table><tr><th>科目</th>${B.cs.map(c=>`<th>${esc(c)}</th>${pc?'<th>%</th>':''}`).join('')}${B.chg?'<th>比較增減 %</th>':''}</tr>`;
       B.rows.forEach(x=>h+=`<tr><td>${esc(x.name)}</td>${B.cs.map(c=>`<td class="num">${fmt(x.v[c])}</td>${pc?`<td class="num">${x.p[c]??''}</td>`:''}`).join('')}${B.chg?`<td class="num">${x.chg??''}</td>`:''}</tr>`);
       h+='</table></div>'; }
-    else if(r.E.length){ h+=`<div class="wrap"><table><tr><th>項目</th><th>欄位</th><th>應為</th><th>實為</th><th>驗算</th></tr>`;
-      [...r.E].sort((a,b)=>isT(a)-isT(b)).forEach(x=>h+=`<tr class="${isT(x)?'tail':''}"><td>${esc(x.row)}</td><td>${esc(x.col)}</td><td class="num">${esc(fmt(x.exp))}</td><td class="num${isT(x)?'':' ng'}">${esc(fmt(x.act))}</td><td>${esc(x.why.replace(/^尾差（[^）]*）：/,''))}${isT(x)?' <span class="pill t">尾差</span>':''}</td></tr>`);
+    else if(r.E.length){ const og=x=>x.org??r.fund??r.rv?.fund??'', hasO=r.E.some(x=>og(x));
+      h+=`<div class="wrap"><table><tr>${hasO?'<th>所屬</th>':''}<th>項目</th><th>欄位</th><th>應為</th><th>實為</th><th>驗算</th></tr>`;
+      [...r.E].sort((a,b)=>isT(a)-isT(b)).forEach(x=>h+=`<tr class="${isT(x)?'tail':''}">${hasO?`<td>${esc(og(x).replace(/股份有限公司$/,''))}</td>`:''}<td>${esc(x.row)}</td><td>${esc(x.col)}</td><td class="num">${esc(fmt(x.exp))}</td><td class="num${isT(x)?'':' ng'}">${esc(fmt(x.act))}</td><td>${esc(x.why.replace(/^尾差（[^）]*）：/,''))}${isT(x)?' <span class="pill t">尾差</span>':''}</td></tr>`);
       h+='</table></div>'; if(!e&&!VIEW.tail) h+='<p class="small">僅有尾差；勾選「顯示尾差」查看。</p>'; }
     else h+='<p class="small ok">全部驗算相符。</p>';
     h+='</div></details>'; });
@@ -532,7 +534,7 @@ function render(){ const n=RES.reduce((s,r)=>s+ne(r),0), t=RES.reduce((s,r)=>s+r
   $('onlyBad').onchange=e=>{ VIEW.onlyBad=e.target.checked; render(); }; $('showTail').onchange=e=>{ VIEW.tail=e.target.checked; render(); };
 }
 function exportXlsx(){ const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['檔案','報表','項目','欄位','應為','實為','驗算'],...RES.flatMap(r=>r.E.map(e=>[r.file||'',nm(r),e.row,e.col,e.exp,e.act,e.why]))]),'檢誤結果');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['檔案','報表','所屬','項目','欄位','應為','實為','驗算'],...RES.flatMap(r=>r.E.map(e=>[r.file||'',nm(r),e.org??r.fund??r.rv?.fund??'',e.row,e.col,e.exp,e.act,e.why]))]),'檢誤結果');
   RES.filter(r=>r.built).forEach((r,i)=>{ const B=r.built, pc=!!B.rows[0]?.p;
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([[r.kind+(r.by==='科目'?'（依科目分列）':'（依'+r.by+'分列）')],['科目',...B.cs.flatMap(c=>pc?[c,'%']:[c]),...(B.chg?['比較增減 %']:[])],
       ...B.rows.map(x=>[x.name,...B.cs.flatMap(c=>pc?[x.v[c],x.p[c]]:[x.v[c]]),...(B.chg?[x.chg]:[])])]),`彙編${i+1}`); });
