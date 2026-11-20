@@ -13,7 +13,7 @@ table{width:100%;border-collapse:collapse;font-size:.88rem}th{background:var(--n
 <section class="card"><h2>上傳 Excel</h2>
 <label class="f">綜計表、預算表、決算檔案（.xlsx／.xls／.ods，國營事業及信託基金另可上傳 PDF；可多選）<small>拖曳檔案到這裡，或點選選擇</small><input type="file" id="fa" accept=".xlsx,.xls,.ods,.pdf" multiple></label>
 <button id="go" disabled>開始檢誤</button> <button id="xl" hidden>匯出 Excel</button> <span id="msg" class="small"></span>
-<p class="small">檔案只在瀏覽器內解析，不會上傳。非營業特種基金：作業基金、特別收入基金、債務基金、資本計畫基金預算表及附錄信託基金之收支餘絀表、餘絀撥補表、基金來源用途及餘絀表（散總：上層科目＝縮排下一層科目加總；% ＝金額÷首列或「…之部」100% 列、比較增減＝本年度－上年度、本期賸餘＝總收入－總支出／基金來源－基金用途／業務賸餘＋業務外賸餘、期末基金餘額＝期初＋本期賸餘－解繳公庫）、現金流量表（各活動淨現金＝該活動各項加總、未計利息股利列＝累計、淨增＝各活動加總、期末＝期初＋淨增）；各綜計表、收支賸餘繳庫綜計表等參考表用下述通用檢誤。<br><b>決算</b>（查核表、決算綜計表，主計總處 113 年度起之 Excel）：依表頭定位上年度決算數／預算數／原列決算數／修正數／決算核定數／比較增減；決算核定數＝原列決算數＋修正數、比較增減＝決算核定數－預算數（平衡表：本年度－上年度）、% 驗算、上層科目＝下層加總、現金流量各活動及淨增、各單位原列（核定）數合計＝各單位加總；散總同預算。決算以元計，差 2 元以內列尾差。<br><b>自動彙編</b>：只上傳國營事業各公司損益表、盈虧撥補表、現金流量表（Excel 或 PDF）而未附綜計表時，自動加總為綜計表（依科目分列含本年度、上年度、前年度決算及 %、比較增減；依業別、依主管機關別分列），可匯出 Excel。業別、主管對照預設為 116 年度綜計表之歸屬，同批上傳含主管清單之參考表時以其為準。以 116 年度 15 家公司彙編結果與主計總處綜計表逐值比對相同（前年度決算僅差 1、2 千元尾差）。<br><b>PDF</b>：國營事業綜計表（依科目／項目分列）、各公司損益表、盈虧撥補表、現金流量表，作業基金、特別收入基金、債務基金、資本計畫基金各基金主要表（收支餘絀表、餘絀撥補表、基金來源用途及餘絀表、現金流量表）及信託基金主要表可直接上傳 PDF（以主計總處 116 年度 113 個 PDF 與 Excel 逐值比對，244 張主要表數值相同；少數跨行之長計畫名稱可能截斷，不影響檢核）；依業別、主管機關別等多欄綜計表及參考表請上傳 Excel。<br><b>散總</b>（同批上傳綜計表與各基金／事業預算表時）：作業基金、特別收入基金、國營事業之綜計表依科目／項目分列＝同類各基金（事業）主要表同科目加總（本年度、上年度、前年度決算）；依基金別分列各欄、特別收入基金基金來源用途及餘絀綜計表各基金列＝該基金主要表。須上傳該類全部基金才會相符，結果標示加總基金數。國營事業各公司損益表、盈虧撥補表與綜計表同版面，一併檢核 %、比較增減。<br>國營事業：依標題自動判斷：損益、盈虧撥補、現金流量綜計表（依科目／項目分列、依業別分列、依主管機關別分列）。檢查：總計欄＝各業別（主管）欄加總；%＝金額÷基準列（營業收入、盈餘之部、分配之部等 % 為 100 之列），差 0.01 以內視為相符；比較增減 %＝（本年度－上年度）÷上年度；同時上傳時另核依業別、依主管機關別之總計欄＝依科目分列之本年度預算數。其餘綜計表及參考表（財務摘要、營業利益、淨利、繳庫盈餘、固定資產、資產變賣、長期債務、轉投資、資本增減、成本效益分析、資本股額、員工人數、用人費用、稅捐規費）用通用檢誤：總計＝各主管、主管＝所屬事業、上層計畫＝所屬計畫、國內＋國外部分；小計／合計欄＝左側各欄；% 及增減欄自動找出公式（如 金額÷合計、（本年度－上年度）÷上年度）後逐列驗算，空白格不報。決算數差 2 以內標「尾差」。專屬檢查：資本增減綜計表 合計現金＝各政府現金、合計轉帳＝各政府轉帳、期末合計＝期初合計＋現金＋轉帳，並勾稽期末實收資本＝資本股額綜計表資本額合計；繳納各項稅捐與規費綜計表 合計區各稅目＝中央＋地方＋外國同稅目、總計＝各稅目＝各小計、規費＝各規費。檔案來源：<a href="https://www.dgbas.gov.tw/News_Content.aspx?n=3626&s=236566">主計總處 116 年度國營事業預算</a>。</p></section>
+<p class="small">檔案只在瀏覽器內解析，不會上傳。非營業特種基金：作業基金、特別收入基金、債務基金、資本計畫基金預算表及附錄信託基金之收支餘絀表、餘絀撥補表、基金來源用途及餘絀表（散總：上層科目＝縮排下一層科目加總；% ＝金額÷首列或「…之部」100% 列、比較增減＝本年度－上年度、本期賸餘＝總收入－總支出／基金來源－基金用途／業務賸餘＋業務外賸餘、期末基金餘額＝期初＋本期賸餘－解繳公庫）、現金流量表（各活動淨現金＝該活動各項加總、未計利息股利列＝累計、淨增＝各活動加總、期末＝期初＋淨增）；各綜計表、收支賸餘繳庫綜計表等參考表用下述通用檢誤。<br><b>決算</b>（查核表、決算綜計表，主計總處 113 年度起之 Excel）：依表頭定位上年度決算數／預算數／原列決算數／修正數／決算核定數／比較增減；決算核定數＝原列決算數＋修正數、比較增減＝決算核定數－預算數（平衡表：本年度－上年度）、% 驗算、上層科目＝下層加總、現金流量各活動及淨增、各單位原列（核定）數合計＝各單位加總；散總同預算。決算以元計，差 2 元以內列尾差。<br><b>彙總表</b>（自編之國營事業各公司並列表：財務摘要、損益、盈虧撥補、現金流量、資產負債，含合計及業別／主管欄）：與同批上傳之各公司主要表（PDF 或 Excel）逐公司逐科目核對（116預算＝本年度、115預算＝上年度、114決算＝前年度決算；財務摘要對各公司財務摘要頁），並驗算合計＝各公司加總、業別／主管欄＝所屬公司加總。<br><b>自動彙編</b>：只上傳國營事業各公司損益表、盈虧撥補表、現金流量表（Excel 或 PDF）而未附綜計表時，自動加總為綜計表（依科目分列含本年度、上年度、前年度決算及 %、比較增減；依業別、依主管機關別分列），可匯出 Excel。業別、主管對照預設為 116 年度綜計表之歸屬，同批上傳含主管清單之參考表時以其為準。以 116 年度 15 家公司彙編結果與主計總處綜計表逐值比對相同（前年度決算僅差 1、2 千元尾差）。<br><b>PDF</b>：國營事業綜計表（依科目／項目分列）、各公司損益表、盈虧撥補表、現金流量表，作業基金、特別收入基金、債務基金、資本計畫基金各基金主要表（收支餘絀表、餘絀撥補表、基金來源用途及餘絀表、現金流量表）及信託基金主要表可直接上傳 PDF（以主計總處 116 年度 113 個 PDF 與 Excel 逐值比對，244 張主要表數值相同；少數跨行之長計畫名稱可能截斷，不影響檢核）；依業別、主管機關別等多欄綜計表及參考表請上傳 Excel。<br><b>散總</b>（同批上傳綜計表與各基金／事業預算表時）：作業基金、特別收入基金、國營事業之綜計表依科目／項目分列＝同類各基金（事業）主要表同科目加總（本年度、上年度、前年度決算）；依基金別分列各欄、特別收入基金基金來源用途及餘絀綜計表各基金列＝該基金主要表。須上傳該類全部基金才會相符，結果標示加總基金數。國營事業各公司損益表、盈虧撥補表與綜計表同版面，一併檢核 %、比較增減。<br>國營事業：依標題自動判斷：損益、盈虧撥補、現金流量綜計表（依科目／項目分列、依業別分列、依主管機關別分列）。檢查：總計欄＝各業別（主管）欄加總；%＝金額÷基準列（營業收入、盈餘之部、分配之部等 % 為 100 之列），差 0.01 以內視為相符；比較增減 %＝（本年度－上年度）÷上年度；同時上傳時另核依業別、依主管機關別之總計欄＝依科目分列之本年度預算數。其餘綜計表及參考表（財務摘要、營業利益、淨利、繳庫盈餘、固定資產、資產變賣、長期債務、轉投資、資本增減、成本效益分析、資本股額、員工人數、用人費用、稅捐規費）用通用檢誤：總計＝各主管、主管＝所屬事業、上層計畫＝所屬計畫、國內＋國外部分；小計／合計欄＝左側各欄；% 及增減欄自動找出公式（如 金額÷合計、（本年度－上年度）÷上年度）後逐列驗算，空白格不報。決算數差 2 以內標「尾差」。專屬檢查：資本增減綜計表 合計現金＝各政府現金、合計轉帳＝各政府轉帳、期末合計＝期初合計＋現金＋轉帳，並勾稽期末實收資本＝資本股額綜計表資本額合計；繳納各項稅捐與規費綜計表 合計區各稅目＝中央＋地方＋外國同稅目、總計＝各稅目＝各小計、規費＝各規費。檔案來源：<a href="https://www.dgbas.gov.tw/News_Content.aspx?n=3626&s=236566">主計總處 116 年度國營事業預算</a>。</p></section>
 <div id="out"></div></main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -74,7 +74,7 @@ const ALIAS={事業投資利益:'採用權益法認列之關聯企業及合資�
   存放銀行業:'存放銀行同業',事業投資:'採用權益法之投資',融通:'押匯貼現及放款',銀行業存款:'銀行同業存款',存款:'存款、匯款及金融債券',公庫及政府機關存款:'支票存款',儲蓄存款及儲蓄券:'儲蓄存款'};   /* 中央銀行專用科目→綜計表科目（同 FS_Sum 對照） */
 function V(r){ const n={}, m=new Map(); let sec='';
   const SR=r.k2==='CF'?/^(投資活動|籌資活動|其他活動)/:SEC;   /* 現金流量只依活動分段 */
-  const put=(name,o)=>{ const k0=ALIAS[key(name)]||key(name); if(SR.test(k0)) sec=k0.match(SR)[1]; const k=sec+'|'+k0; n[k]=(n[k]||0)+1; m.set(k+'#'+n[k],{name,...o}); };   /* 同名科目依所屬段落區分 */
+  const put=(name,o)=>{ const k0=ALIAS[key(name)]||key(name); if(SR.test(k0)&&!/^歸屬於/.test(k0)) sec=k0.match(SR)[1];   /* 單獨一列「歸屬於：」沿用上段（本期淨利） */ const k=sec+'|'+k0; n[k]=(n[k]||0)+1; m.set(k+'#'+n[k],{name,...o}); };   /* 同名科目依所屬段落區分 */
   if(r.gs){ const g=re=>r.gs.find(x=>re.test(x.h)&&!/增減/.test(x.h));
     const G={本年度:g(/本年度/),上年度:g(/上年度/),前年度決算:g(/決算/)};
     r.rows.forEach(x=>put(x.name,Object.fromEntries(Object.entries(G).filter(([,v])=>v).map(([k,v])=>[k,N(x.r[v.a])])))); }
@@ -380,15 +380,67 @@ function buildSoe(rs){ const out=[], own={};
       const brows=order.map(([k,name])=>({name,v:Object.fromEntries([['總計',sum(()=>true,k,'本年度')],...hs.map(h=>[h,sum(([n])=>grp(n)===h,k,'本年度')])])}));
       out.push({kind:`國營事業${kn}綜計表`,by,rows:[],E:[],x:`自動彙編依${by}分列：${hs.map(h=>h+'＝'+allN.filter(n=>grp(n)===h).join('、')).join('；')}`,built:{cs:['總計',...hs],rows:brows}}); } }
   return out; }
+/* 國營事業彙總表（各公司並列＋合計＋業別／主管欄；使用者自編）：各公司欄與公司主要表核對、合計與業別／主管欄內部勾稽 */
+const HZ={央行:'中央銀行',台糖:'台灣糖業',中油:'台灣中油',台電:'台灣電力',自來水:'台灣自來水',輸銀:'中國輸出入銀行',金控:'臺灣金融控股',土銀:'臺灣土地銀行',印刷廠:'財政部印刷廠',菸酒:'臺灣菸酒',
+  郵政:'中華郵政',臺鐵:'國營臺灣鐵路',台鐵:'國營臺灣鐵路',港務公司:'臺灣港務',機場公司:'桃園國際機場',存保:'中央存款保險'};
+const HZG={製造業:'製造業',電力及燃氣供應業:'電力及燃氣供應業',電力燃氣:'電力及燃氣供應業',用水供應及汙染整治業:'用水供應及污染整治業',用水供應:'用水供應及污染整治業',運輸及倉儲業:'運輸及倉儲業',運輸倉儲:'運輸及倉儲業',金融及保險業:'金融及保險業',金融保險:'金融及保險業',
+  行政院:'行政院主管',經濟部:'經濟部主管',財政部:'財政部主管',交通部:'交通部主管',金管會:'金融監督管理委員會主管'};
+function parseHz(aoa,sheet){
+  const hi=aoa.findIndex((r,i)=>i<6&&r?.some(c=>T(c)==='央行')&&r.some(c=>T(c)==='合計')); if(hi<0) return null;
+  const t0=T((aoa[0]||[]).join('')), title=(t0.match(/^(.+?)\1+$/)||[,t0])[1], m0=title.match(/(損益|盈虧撥補|現金流量|財務摘要|資產|負債)/); if(!m0) return null;   /* 跨頁重複標題取一次 */
+  const k2={損益:'IS',盈虧撥補:'RE',現金流量:'CF',財務摘要:'FS',資產:'BS',負債:'BS'}[m0[1]];
+  const per=/114決算|決算數/.test(sheet+title)?'前年度決算':/115預算/.test(sheet+title)?'上年度':'本年度';
+  const H=aoa[hi].map(T), S=(aoa[hi+1]||[]).map(T), cols=[]; let sec=null;   /* 欄：公司／合計／業別／主管；每組含若干子欄 */
+  H.forEach((h,i)=>{ if(!h||i===0) return; let t=HZ[h]?'co':h==='合計'?'tot':HZG[h]?'grp':null; if(!t) { sec=null; return; }
+    const sub=S[i]||''; cols.push({i,h,t,name:HZ[h]||HZG[h]||h,sub}); });
+  /* 同一公司之其他子欄（財務摘要、資產負債：本年度／上年度／增減） */
+  const subs=cols.length?[...new Set(H.map((h,i)=>i).filter(i=>i>cols[0].i&&i<(cols[1]?.i??0)).map(i=>S[i]))]:[];
+  const width=cols.length>1?cols[1].i-cols[0].i:1;
+  const rows=[]; upToNote(aoa.slice(hi+2)).forEach(r=>{ const name=T(r?.[0]); if(!name) return; const vals=cols.map(c=>[...Array(width)].map((_,j)=>N(r[c.i+j])));
+    if(/^(企業)?及合資(利益|損失)之份額$/.test(name)) return;   /* 折行殘段（名稱另行補全） */
+    const coV=vals.filter((_,j)=>cols[j].t==='co');
+    if(coV.every(v=>v.every(x=>x==null))&&rows.length&&!/(現金流量|之部|[：:])$/.test(name)&&!/(現金流量|之部|[：:])$/.test(rows[rows.length-1].name)&&!/^(營業|投資|籌資|業務)活動/.test(name)){ rows[rows.length-1].name+=name; return; }   /* 科目折行（各公司欄皆無數字）；段落標題不併 */
+    const lastS=[...rows].reverse().find(r=>SEC.test(key(r.name)))?.name||'';
+    if(/^(企業)?及合資(利益|損失)之份額$/.test(name)) return;   /* 折行殘段 */
+    rows.push({name:/^採用權益法認列之關聯/.test(name)?`採用權益法認列之關聯企業及合資${/成本|費用/.test(lastS)?'損失':'利益'}之份額`:name,vals}); });   /* 截斷之科目名稱補全 */
+  const E=[], err=(row,col,exp,act,why)=>E.push({row,col,exp,act:act??'空白',why});
+  /* 合計＝各公司；業別／主管欄＝所屬公司 */
+  const co=cols.filter(c=>c.t==='co'), grpOf=(n,map)=>map[short(n)];
+  const firstTot=cols.find(c=>c.t==='tot');
+  rows.forEach(x=>{ const v=c=>x.vals[cols.indexOf(c)]; const isPct=/^[%％]$/;
+    for(let j=0;j<width;j++){ if(isPct.test(T(aoa[hi+1]?.[co[0].i+j]))) continue;
+      const sum=co.reduce((t,c)=>t+(v(c)[j]||0),0);
+      const dd=firstTot&&v(firstTot)[j]!=null?Math.abs(v(firstTot)[j]-sum):0, dec=!Number.isInteger(v(firstTot)?.[j]??0)||k2==='FS';
+      if(dd>(dec?0.006:0.5)) err(x.name,`合計${width>1?' '+T(aoa[hi+1]?.[firstTot.i+j]):''}`,Math.round(sum*100)/100,v(firstTot)[j],(dec&&dd<=0.0751||!dec&&dd<=2&&per==='前年度決算'?'尾差（四捨五入）：':'')+'合計＝各公司加總');
+      if(j) continue;
+      cols.filter(c=>c.t==='grp').forEach(c=>{ const map=/主管$/.test(c.name)?SOE_GOV:SOE_IND, e=co.filter(k=>map[short(k.name)]===c.name).reduce((t,k)=>t+(v(k)[0]||0),0);
+        if(v(c)[0]!=null&&Math.abs(v(c)[0]-e)>0.5) err(x.name,c.h,e,v(c)[0],`${c.h}＝${co.filter(k=>map[short(k.name)]===c.name).map(k=>k.h).join('＋')}`); }); } });
+  return {kind:`彙總表 ${title}（${sheet}）`,by:'',rows:[],E,x:'通用檢誤',hz:{k2,per,cols,rows,width,sub:(aoa[hi+1]||[]).map(T)}};
+}
+/* 彙總表各公司欄＝公司主要表 */
+function crossHz(rs){ const out=[];
+  for(const z of rs.filter(r=>r.hz)){ const {k2,per,cols,rows,width,sub}=z.hz, E=[]; let n=0;
+    for(const [ci,c] of cols.entries()){ if(c.t!=='co') continue;
+      if(k2==='FS'){ const f=rs.find(r=>/財務摘要/.test(r.kind)&&r.rows?.length&&short(r.kind.replace(/財務摘要.*$/,''))===short(c.name)); if(!f) continue; n++;
+        const fc=[...new Set(f.rows.flatMap(x=>x.v.map((v,i)=>v!=null?i:-1)).filter(i=>i>=0))].sort((a,b)=>a-b), fm=new Map(f.rows.map(x=>[key(x.name),fc.map(i=>x.v[i])]));   /* 依欄位置對應，空格不位移 */
+        rows.forEach(x=>{ const y=fm.get(key(x.name)); if(!y) return; for(let j=0;j<Math.min(width,3);j++){ const a=x.vals[ci][j], e=y[j]; if(e==null) continue;   /* 主要表留白（如正負易位不列增減）不比 */
+          if(Math.abs((a||0)-(e||0))>0.006) E.push({row:x.name,col:`${c.h} ${sub[c.i+j]||''}`,exp:e??'空白',act:a??'空白',why:`彙總表＝${c.name}財務摘要`}); } }); continue; }
+      const f=rs.find(r=>r.wt==='營業'&&!r.zong&&r.k2===k2&&short(r.fund)===short(c.name)); if(!f) continue; n++;
+      const fv=V(f), zv=V({fin:1,k2,rows:rows.map(x=>({name:x.name,v:{[per]:x.vals[ci][0]}}))});
+      for(const k of zv.keys()){ const mt=k.match(/^([^|]*)\|母公司業主#1$/); if(mt&&!fv.has(k)){ const src=[...fv.entries()].find(([kk])=>kk.startsWith(mt[1]+'|本期')); if(src) fv.set(k,src[1]); } }   /* 無非控制權益之公司：母公司業主＝本期淨利 */
+      for(const [k,o] of zv){ const a=o[per], y=fv.get(k), e=y?.[per]; if(a==null&&e==null) continue; if(!y&&!a) continue;
+        const dd=Math.abs((a||0)-(e||0)); if(dd>0.5) E.push({row:o.name,col:`${c.h} ${per}`,exp:y?(e??'空白'):'（主要表無此科目）',act:a??'空白',why:(dd<=2&&per==='前年度決算'?'尾差（決算數 ±2 以內）：':'')+`彙總表＝${c.name}主要表`}); } }
+    if(n) out.push({kind:z.kind.replace(/^彙總表/,'彙總表↔主要表'),by:'',rows:[],E,x:'散總',file:`${z.kind}：${n} 家公司核對`}); }
+  return out; }
 /* 一個活頁簿（一個檔案）→ 各表結果；單一基金／公司主要表標記類別 wt 供散總 */
-function parseBook(sheets){ const rs=sheets.map(a=>{ const r=parseFinal(a)||parseSheet(a)||parseStmt(a)||parseGeneric(a);
+function parseBook(sheets,names=[]){ const rs=sheets.map((a,si)=>{ const r=parseHz(a,names[si]||'')||parseFinal(a)||parseSheet(a)||parseStmt(a)||parseGeneric(a);
     if(r&&/單位[:：]新臺幣元|決算/.test(T(a.slice(0,4).flat().join('')))) r.E.forEach(e=>{ if(typeof e.exp==='number'&&Math.abs((N(e.act)||0)-e.exp)<=2&&!/^尾差/.test(e.why)&&!/%/.test(e.col)) e.why='尾差（決算 ±2 以內）：'+e.why; });   /* 決算以元為單位，加總差 1、2 元列尾差 */
     return r; }).filter(Boolean);
   const own=rs.filter(r=>!r.zong&&r.k2);
   const t=own.some(r=>/損益|盈虧撥補/.test(r.kind))?'營業':own.some(r=>r.k2==='IS'&&r.rows.some(x=>key(x.name)==='業務收入'))?'作業':own.some(r=>r.k2==='SF'&&!/債務基金|營舍/.test(r.fund))?'特收':'';
   own.forEach(r=>r.wt=t); return rs; }
 // core-end
-const nm=r=>r.x==='通用檢誤'?r.kind:r.single&&!r.zong&&r.fund?`${r.fund}${r.kind}表`:`${r.kind.replace(/綜計表$/,'')}綜計表（${r.x||'依'+r.by+'分列'}）`;
+const nm=r=>r.x==='通用檢誤'||/^彙總表/.test(r.kind)?r.kind:r.single&&!r.zong&&r.fund?`${r.fund}${r.kind}表`:`${r.kind.replace(/綜計表$/,'')}綜計表（${r.x||'依'+r.by+'分列'}）`;
 const $=id=>document.getElementById(id), esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])), fmt=n=>typeof n==='number'?n.toLocaleString('en-US',{maximumFractionDigits:2}):n;
 let RES=[];
 const isT=e=>/^尾差/.test(e.why), ne=r=>r.E.filter(e=>!isT(e)).length;
@@ -421,12 +473,12 @@ $('go').onclick=async()=>{ $('msg').textContent='解析中…'; RES=[]; let skip
       if(/\.pdf$/i.test(f.name)){ const doc=await pdfjsLib.getDocument({data:await f.arrayBuffer()}).promise; const pages=[];   /* PDF：逐頁文字位置轉列欄，同表跨頁接續 */
         for(let n=1;n<=doc.numPages;n++){ const tc=await (await doc.getPage(n)).getTextContent(); pages.push(tc.items.map(i=>({s:i.str,x:i.transform[4],y:i.transform[5],w:i.width}))); }
         sheets=pdfToSheets(pages); }
-      else { const wb=XLSX.read(await f.arrayBuffer()); sheets=wb.SheetNames.map(sn=>XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:false,defval:null})); }
-      let rs=parseBook(sheets);
+      else { const wb=XLSX.read(await f.arrayBuffer()); sheets=wb.SheetNames.map(sn=>XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:false,defval:null})); sheets.names=wb.SheetNames; }
+      let rs=parseBook(sheets,sheets.names);
       if(/\.pdf$/i.test(f.name)){ const no=rs.filter(r=>!(r.single||r.gs||r.cf||r.fin)&&!/財務摘要/.test(r.kind)); rs=rs.filter(r=>r.single||r.gs||r.cf||r.fin); if(no.length&&!rs.length) rs.pdfOnly=1;   /* ponytail: PDF 只收已與 Excel 逐值比對無誤之主要表；多欄綜計表、參考表之對開頁尚未支援 */
         if(no.length) pdfNo.push(`${f.name}（${no.map(r=>r.kind.replace(/^.*?(?=[^)）]*綜計表)/,'')).join('、')}）`); } rs.forEach(r=>{r.file=r.file||f.name; RES.push(r);}); hit=rs.length;
       if(!hit&&!rs.pdfOnly) skip.push(f.name); }
-    RES.push(...cross(RES)); RES.push(...buildSoe(RES)); render(); $('xl').hidden=!RES.length; $('xl').onclick=exportXlsx;
+    RES.push(...cross(RES)); RES.push(...crossHz(RES)); RES.push(...buildSoe(RES.filter(r=>!r.hz))); render(); $('xl').hidden=!RES.length; $('xl').onclick=exportXlsx;
     $('msg').textContent=(skip.length?`未支援的報表：${skip.join('、')}。`:'')+(pdfNo.length?`以下 PDF 表格請改上傳 Excel：${pdfNo.join('；')}。`:'');
   }catch(e){ $('msg').textContent='解析失敗：'+e.message; console.error(e); } };
 </script></body></html>
