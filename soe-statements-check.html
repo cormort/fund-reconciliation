@@ -15,6 +15,12 @@ details.rep>summary::before{content:'▸';color:#9fb1c0;width:1em}details.rep[op
 .pill{border-radius:999px;padding:1px 9px;font-size:.8rem;white-space:nowrap}.pill.ok{background:#e3f2e5;color:#2e7d32}.pill.ng{background:#fde4e4;color:#c62828}.pill.t{background:#fff4d6;color:#8a6d00}
 details.rep .body{padding:4px 0 12px 1.6em}tr.tail td{color:#8a99a5}.hideTail tr.tail{display:none}
 td.src{font-size:.78rem;color:#667784;min-width:12em}
+a.srcl{color:var(--b);text-decoration:underline dotted}
+#modal{position:fixed;inset:24px;background:#fff;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,.35);display:flex;flex-direction:column;z-index:10}#modal[hidden]{display:none}
+#modal .mhead{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:.9rem}#modal .btn{margin:0 0 0 6px;padding:5px 12px;border-radius:6px;background:var(--n);color:#fff;text-decoration:none;font-size:.85rem;font-weight:700;border:0;cursor:pointer}
+#modal .mbody{overflow:auto;flex:1}table.sheet{font-size:.78rem;width:auto}table.sheet th{position:sticky;top:0;background:#eef2f6;color:#4b5b67;font-weight:400;border:1px solid var(--line)}table.sheet tr>th:first-child{position:sticky;left:0}table.sheet td{border:1px solid #edf1f4;white-space:nowrap;padding:2px 6px}
+table.sheet tr.hit td{background:#fff8dc}table.sheet td.cell{background:#ffd54f;outline:2px solid #c62828;font-weight:700}
+@media(max-width:600px){#modal{inset:6px}}
 details.help{margin-top:12px;font-size:.88rem;color:#4b5b67}details.help summary{cursor:pointer;color:var(--b);font-weight:600}details.help h4{margin:12px 0 4px;color:var(--n)}details.help ul{margin:0;padding-left:1.3em}
 </style></head><body>
 <header><div><h1>綜計表及預算表檢誤</h1><p>國營事業、非營業特種基金、信託基金之綜計表、預算表、決算、審核摘要表與彙總表；驗算合計、百分比、比較增減，並做表間勾稽與散總。<br><a href="index.html">← 回專區</a></p></div></header>
@@ -39,6 +45,7 @@ details.help{margin-top:12px;font-size:.88rem;color:#4b5b67}details.help summary
 <h4>尾差</h4><ul><li>決算數差 2 以內、百分比差 0.01 以內、億元摘要差 0.08 以內列「尾差」，不計入錯誤</li></ul>
 </details></section>
 <div id="out"></div></main>
+<div id="modal" hidden></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
@@ -504,14 +511,16 @@ function parseBook(sheets,names=[],offs=[]){ const rs=sheets.map((a,si)=>{ a.for
   rs.forEach(r=>r.cat=r.rv?'審核摘要表':r.hz?'彙總表':soe?'國營事業':trust?'信託基金':'非營業特種基金');   /* 結果分頁用 */
   return rs; }
 /* 來源：在原始工作表中找出該項目所在列（必要時從所屬公司／基金列往下找）及數值所在欄 */
-function where(res,name,org,val,ci){ if(!res) return ''; const head=[res.src,res.sh].filter(Boolean); const a=res.aoa; if(!a) return head.join(' › ');
+function where(...x){ return locate(...x).text; }
+function locate(res,name,org,val,ci){ const no={res,k:-1,j:-1}; if(!res) return {...no,text:''}; const head=[res.src,res.sh].filter(Boolean); const a=res.aoa; if(!a) return {...no,text:head.join(' › ')};
   const nm=T(name).replace(/^[(]?[一二三四五六七八九十\d]+[、.)]/,''), hit=c=>{ const t=T(c); if(!t||N(c)!=null) return false; const u=t.replace(/^[(]?[一二三四五六七八九十\d]+[、.)]/,''); return u===nm||t===T(name)||u.length>=4&&nm.startsWith(u); };
   let st=0; if(org){ const o=a.findIndex(r=>r?.some(c=>T(c)===T(org))); if(o>=0) st=o; }
-  let k=a.findIndex((r,i)=>i>=st&&r?.some(hit)); if(k<0) k=a.findIndex(r=>r?.some(hit)); if(k<0) return head.join(' › ');
+  let k=a.findIndex((r,i)=>i>=st&&r?.some(hit)); if(k<0) k=a.findIndex(r=>r?.some(hit)); if(k<0) return {...no,text:head.join(' › ')};
   const row=a[k], v=typeof val==='number'?val:N(val); let j=ci!=null?ci:v==null?-1:row.findIndex(c=>N(c)!=null&&Math.abs(N(c)-v)<1e-6&&!/^-$/.test(T(c))||v===0&&T(c)==='-');
   const at=row._pg!=null?`第 ${row._pg} 頁`:row._i?`第 ${row._i} 列${j>=0&&typeof XLSX!=='undefined'?' '+XLSX.utils.encode_col(j)+' 欄':''}`:'';
-  return [...head,at].filter(Boolean).join(' › '); }
-const srcOf=(r,e)=>({act:where(e.ar||r,e.row,e.org,e.act,e.ci),exp:e.er?where(e.er,e.erow||e.row,e.org,e.exp):e.esrc||''});
+  return {res,k,j,pg:row._pg,text:[...head,at].filter(Boolean).join(' › ')}; }
+const locOf=(r,e)=>({act:locate(e.ar||r,e.row,e.org,e.act,e.ci),exp:e.er?locate(e.er,e.erow||e.row,e.org,e.exp):{text:e.esrc||''}});
+const srcOf=(r,e)=>{ const o=locOf(r,e); return {act:o.act.text,exp:o.exp.text}; };
 // core-end
 const nm=r=>r.x==='通用檢誤'||/^(彙總表|預算審核摘要表)/.test(r.kind)?r.kind:r.single&&!r.zong&&r.fund?`${r.fund}${r.kind}表`:`${r.kind.replace(/綜計表$/,'')}綜計表（${r.x||'依'+r.by+'分列'}）`;
 const $=id=>document.getElementById(id), esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])), fmt=n=>typeof n==='number'?n.toLocaleString('en-US',{maximumFractionDigits:2}):n;
@@ -519,8 +528,19 @@ let RES=[];
 const isT=e=>/^尾差/.test(e.why), ne=r=>r.E.filter(e=>!isT(e)).length;
 const CATS=['國營事業','非營業特種基金','信託基金','審核摘要表','彙總表','勾稽／散總','自動彙編'];
 const catOf=r=>r.built?'自動彙編':/^(預算審核摘要表↔|彙總表↔)/.test(r.kind)||r.x==='散總'||/勾稽/.test(r.x||'')?'勾稽／散總':r.cat||'非營業特種基金';
-let VIEW={tab:null,onlyBad:false,tail:false};
-function render(){ const n=RES.reduce((s,r)=>s+ne(r),0), t=RES.reduce((s,r)=>s+r.E.length-ne(r),0), rep=RES.filter(r=>!r.built), bad=rep.filter(r=>ne(r)).length;
+let VIEW={tab:null,onlyBad:false,tail:false}, SRC=[];
+const srcLink=L=>L.res?.fileObj?`<a href="#" class="srcl" data-src="${SRC.push(L)-1}" title="${L.pg!=null?'開啟 PDF 至該頁':'預覽工作表並標示該格'}">${esc(L.text)}</a>`:esc(L.text);   /* 來源可點：PDF 開新分頁至該頁、Excel 頁內預覽 */
+const urls=new Map(), urlOf=f=>{ if(!urls.has(f)) urls.set(f,URL.createObjectURL(f)); return urls.get(f); };
+function openSrc(L){ const f=L.res.fileObj;
+  if(L.pg!=null||/\.pdf$/i.test(f.name)){ window.open(urlOf(f)+(L.pg?'#page='+L.pg:''),'_blank'); return; }
+  const a=L.res.aoa, W=Math.max(...a.map(r=>r?.length||0)), cn=j=>XLSX.utils.encode_col(j);
+  let h=`<div class="mhead"><b>${esc(L.text)}</b><span><a class="btn" href="${urlOf(f)}" download="${esc(f.name)}">下載原檔</a><button class="btn" id="mclose">關閉</button></span></div><div class="mbody"><table class="sheet"><tr><th></th>${[...Array(W)].map((_,j)=>`<th>${cn(j)}</th>`).join('')}</tr>`;
+  a.forEach((r,i)=>{ h+=`<tr class="${i===L.k?'hit':''}"${i===L.k?' id="mhit"':''}><th>${r?._i??i+1}</th>${[...Array(W)].map((_,j)=>`<td class="${i===L.k&&j===L.j?'cell':''}">${esc(r?.[j]??'')}</td>`).join('')}</tr>`; });
+  $('modal').innerHTML=h+'</table></div>'; $('modal').hidden=false; $('mclose').onclick=()=>$('modal').hidden=true;
+  document.getElementById('mhit')?.scrollIntoView({block:'center'}); document.querySelector('#modal td.cell')?.scrollIntoView({block:'center',inline:'center'}); }
+document.addEventListener('click',e=>{ const a=e.target.closest('a.srcl'); if(!a) return; e.preventDefault(); openSrc(SRC[+a.dataset.src]); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&$('modal')) $('modal').hidden=true; });
+function render(){ SRC=[]; const n=RES.reduce((s,r)=>s+ne(r),0), t=RES.reduce((s,r)=>s+r.E.length-ne(r),0), rep=RES.filter(r=>!r.built), bad=rep.filter(r=>ne(r)).length;
   const by={}; RES.forEach(r=>(by[catOf(r)]=by[catOf(r)]||[]).push(r)); const tabs=CATS.filter(c=>by[c]);
   if(!tabs.includes(VIEW.tab)) VIEW.tab=tabs.find(c=>by[c].some(r=>ne(r)))||tabs[0];
   let h=`<section class="card"><h2>檢誤結果</h2><div class="tiles"><div class="tile"><b>${rep.length}</b><span>報表／勾稽</span></div><div class="tile ${bad?'bad':''}"><b>${bad}</b><span>有錯誤</span></div><div class="tile ${n?'bad':''}"><b>${n}</b><span>錯誤筆數</span></div><div class="tile"><b>${t}</b><span>尾差筆數</span></div><div class="tile"><b>${rep.length-bad}</b><span>通過</span></div></div>`;
@@ -536,7 +556,7 @@ function render(){ const n=RES.reduce((s,r)=>s+ne(r),0), t=RES.reduce((s,r)=>s+r
       h+='</table></div>'; }
     else if(r.E.length){ const og=x=>x.org??r.fund??r.rv?.fund??'', hasO=r.E.some(x=>og(x));
       h+=`<div class="wrap"><table><tr>${hasO?'<th>所屬</th>':''}<th>項目</th><th>欄位</th><th>應為</th><th>實為</th><th>驗算</th><th>來源</th></tr>`;
-      [...r.E].sort((a,b)=>isT(a)-isT(b)).forEach(x=>h+=`<tr class="${isT(x)?'tail':''}">${hasO?`<td>${esc(og(x).replace(/股份有限公司$/,''))}</td>`:''}<td>${esc(x.row)}</td><td>${esc(x.col)}</td><td class="num">${esc(fmt(x.exp))}</td><td class="num${isT(x)?'':' ng'}">${esc(fmt(x.act))}</td><td>${esc(x.why.replace(/^尾差（[^）]*）：/,''))}${isT(x)?' <span class="pill t">尾差</span>':''}</td><td class="src">${(o=>`實為：${esc(o.act)}${o.exp?`<br>應為：${esc(o.exp)}`:''}`)(srcOf(r,x))}</td></tr>`);
+      [...r.E].sort((a,b)=>isT(a)-isT(b)).forEach(x=>h+=`<tr class="${isT(x)?'tail':''}">${hasO?`<td>${esc(og(x).replace(/股份有限公司$/,''))}</td>`:''}<td>${esc(x.row)}</td><td>${esc(x.col)}</td><td class="num">${esc(fmt(x.exp))}</td><td class="num${isT(x)?'':' ng'}">${esc(fmt(x.act))}</td><td>${esc(x.why.replace(/^尾差（[^）]*）：/,''))}${isT(x)?' <span class="pill t">尾差</span>':''}</td><td class="src">${(o=>`實為：${srcLink(o.act)}${o.exp.text?`<br>應為：${srcLink(o.exp)}`:''}`)(locOf(r,x))}</td></tr>`);
       h+='</table></div>'; if(!e&&!VIEW.tail) h+='<p class="small">僅有尾差；勾選「顯示尾差」查看。</p>'; }
     else h+='<p class="small ok">全部驗算相符。</p>';
     h+='</div></details>'; });
@@ -563,7 +583,7 @@ $('go').onclick=async()=>{ $('msg').textContent='解析中…'; RES=[]; let skip
       else { const wb=XLSX.read(await f.arrayBuffer()); sheets=wb.SheetNames.map(sn=>XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:false,defval:null})); sheets.names=wb.SheetNames; sheets.offs=wb.SheetNames.map(sn=>{ const ref=wb.Sheets[sn]['!ref']; return ref?XLSX.utils.decode_range(ref).s.r:0; }); }
       let rs=parseBook(sheets,sheets.names,sheets.offs);
       if(/\.pdf$/i.test(f.name)){ const no=rs.filter(r=>!(r.single||r.gs||r.cf||r.fin)&&!/財務摘要/.test(r.kind)); rs=rs.filter(r=>r.single||r.gs||r.cf||r.fin); if(no.length&&!rs.length) rs.pdfOnly=1;   /* ponytail: PDF 只收已與 Excel 逐值比對無誤之主要表；多欄綜計表、參考表之對開頁尚未支援 */
-        if(no.length) pdfNo.push(`${f.name}（${no.map(r=>r.kind.replace(/^.*?(?=[^)）]*綜計表)/,'')).join('、')}）`); } rs.forEach(r=>{r.src=f.name; r.file=r.file||f.name; RES.push(r);}); hit=rs.length;
+        if(no.length) pdfNo.push(`${f.name}（${no.map(r=>r.kind.replace(/^.*?(?=[^)）]*綜計表)/,'')).join('、')}）`); } rs.forEach(r=>{r.src=f.name; r.fileObj=f; r.file=r.file||f.name; RES.push(r);}); hit=rs.length;
       if(!hit&&!rs.pdfOnly) skip.push(f.name); }
     RES.push(...cross(RES)); RES.push(...crossHz(RES)); RES.push(...crossReview(RES)); RES.push(...buildSoe(RES.filter(r=>!r.hz))); render(); $('xl').hidden=!RES.length; $('xl').onclick=exportXlsx;
     $('msg').textContent=(skip.length?`未支援的報表：${skip.join('、')}。`:'')+(pdfNo.length?`以下 PDF 表格請改上傳 Excel：${pdfNo.join('；')}。`:'');
