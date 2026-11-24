@@ -507,7 +507,7 @@ function parseBook(sheets,names=[],offs=[]){ const rs=sheets.map((a,si)=>{ a.for
   const t=own.some(r=>/損益|盈虧撥補/.test(r.kind))?'營業':own.some(r=>r.k2==='IS'&&r.rows.some(x=>key(x.name)==='業務收入'))?'作業':own.some(r=>r.k2==='SF'&&!/債務基金|營舍/.test(r.fund))?'特收':'';
   own.forEach(r=>r.wt=t);
   const trust=own.some(r=>r.k2==='IS'&&r.rows.some(x=>key(x.name)==='總收入'))&&!own.some(r=>r.rows.some(x=>key(x.name)==='業務收入'));
-  const soe=t==='營業'||rs.some(r=>zt(r)==='營業'||r.rows?.some(x=>/(股份有限公司|銀行|印刷廠)$/.test(x.name)));
+  const soe=t==='營業'||rs.some(r=>zt(r)==='營業'||/營業部分/.test(r.kind)||r.rows?.some(x=>/(股份有限公司|銀行|印刷廠)$/.test(x.name)));
   rs.forEach(r=>r.cat=r.rv?'審核摘要表':r.hz?'彙總表':soe?'國營事業':trust?'信託基金':'非營業特種基金');   /* 結果分頁用 */
   return rs; }
 /* 來源：在原始工作表中找出該項目所在列（必要時從所屬公司／基金列往下找）及數值所在欄 */
@@ -569,7 +569,8 @@ function exportXlsx(){ const wb=XLSX.utils.book_new();
   RES.filter(r=>r.built).forEach((r,i)=>{ const B=r.built, pc=!!B.rows[0]?.p;
     XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([[r.kind+(r.by==='科目'?'（依科目分列）':'（依'+r.by+'分列）')],['科目',...B.cs.flatMap(c=>pc?[c,'%']:[c]),...(B.chg?['比較增減 %']:[])],
       ...B.rows.map(x=>[x.name,...B.cs.flatMap(c=>pc?[x.v[c],x.p[c]]:[x.v[c]]),...(B.chg?[x.chg]:[])])]),`彙編${i+1}`); });
-  XLSX.writeFile(wb,'國營事業綜計表檢誤.xlsx'); }
+  const has=c=>RES.some(r=>r.cat===c), pre=has('國營事業')?(has('非營業特種基金')?'':'國營事業'):has('非營業特種基金')?'非營業特種基金':has('信託基金')?'信託基金':'';
+  XLSX.writeFile(wb,pre+'綜計表檢誤.xlsx'); }
 const inp=$('fa'), lab=inp.closest('label'), ready=()=>$('go').disabled=!inp.files.length;
 inp.onchange=ready;
 lab.ondragover=e=>{e.preventDefault();lab.classList.add('over');}; lab.ondragleave=()=>lab.classList.remove('over');
