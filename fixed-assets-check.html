@@ -28,6 +28,14 @@ const norm=s=>s.replace(/\s+/g,'');
 // 部分 PDF 用部首字代替一般漢字（⾦、⺠、⻑）：NFKC 處理康熙部首，補充部首另外對照
 const RAD={'⺠':'民','⻑':'長','⻄':'西','⻘':'青','⻝':'食','⻩':'黃','⻆':'角','⻭':'齒','⻯':'龍','⻜':'飛','⺟':'母','⻤':'鬼','⻣':'骨'};
 const fix=s=>s.normalize('NFKC').replace(/[⺀-⻿]/g,c=>RAD[c]||c);
+/* 取頁面文字，排除粗體疊印的重複字（同字同位置只留一個） */
+async function textItems(pg){
+  const out=[];
+  for(const i of (await pg.getTextContent()).items){ const x=i.transform[4], y=i.transform[5];
+    if(out.some(j=>j.str===i.str&&Math.abs(j.transform[4]-x)<1&&Math.abs(j.transform[5]-y)<1)) continue;
+    out.push(i); }
+  return out;
+}
 const isNum=s=>/^-?[\d,]+(\.\d+)?$|^-$/.test(s);
 const toNum=s=>s==='-'?0:+s.replace(/,/g,'');
 const fmt=n=>n.toLocaleString('en-US');
@@ -37,7 +45,7 @@ async function parse(buf){
   const doc=await pdfjsLib.getDocument({data:buf,cMapUrl:'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/',cMapPacked:true}).promise, out=[], ALL=[];
   let year='', cur={m:'',f:'',c:''}, last=null, biz=false;
   const items=async p=>{const pg=await doc.getPage(p),H=pg.getViewport({scale:1}).height;
-    const its=(await pg.getTextContent()).items.filter(i=>i.str.trim()||(i.str&&i.width<4)).map(i=>({x:i.transform[4],y:H-i.transform[5],w:i.width,t:fix(i.str)}))
+    const its=(await textItems(pg)).filter(i=>i.str.trim()||(i.str&&i.width<4)).map(i=>({x:i.transform[4],y:H-i.transform[5],w:i.width,t:fix(i.str)}))
       .sort((a,b)=>Math.abs(a.y-b.y)>5?a.y-b.y:a.x-b.x), out=[];
     // 有的 PDF 把一個詞拆成好幾段（「外借資」＋「金」），同列且緊貼的段落先併回來
     for(const i of its){const p=out[out.length-1];
